@@ -117,6 +117,9 @@ var PLAYERS = [{
   name: "Player D",
   color: "#8b7cf6"
 }];
+var DEFAULT_TURN_ORDER = PLAYERS.map(function (player) {
+  return player.id;
+});
 var COSTS = {
   route: {
     rock: 1,
@@ -268,6 +271,12 @@ function shuffle(items, random) {
     next[j] = _ref2[1];
   }
   return next;
+}
+function setupOrderFor(turnOrder) {
+  return [].concat(_toConsumableArray(turnOrder), _toConsumableArray(_toConsumableArray(turnOrder).reverse()));
+}
+function randomTurnOrder() {
+  return shuffle(DEFAULT_TURN_ORDER, Math.random);
 }
 function hexToPixel(q, r) {
   return {
@@ -489,6 +498,7 @@ function createGame() {
   var neutron = (_board$tiles$find$id = (_board$tiles$find = board.tiles.find(function (tile) {
     return tile.terrain === "desert";
   })) === null || _board$tiles$find === void 0 ? void 0 : _board$tiles$find.id) !== null && _board$tiles$find$id !== void 0 ? _board$tiles$find$id : 9;
+  var turnOrder = DEFAULT_TURN_ORDER;
   return {
     id: roomId,
     board: board,
@@ -510,12 +520,14 @@ function createGame() {
     routes: {},
     deck: shuffle(DEV_DECK, mulberry32(hashString("".concat(roomId, ":deck")))),
     discard: [],
-    turn: 0,
+    turn: turnOrder[0],
+    turnOrder: turnOrder,
     turnCount: 0,
     phase: "setup",
     turnStage: "setup",
+    orderLocked: false,
     setupStep: 0,
-    setupOrder: [0, 1, 2, 3, 3, 2, 1, 0],
+    setupOrder: setupOrderFor(turnOrder),
     setupPendingVertex: null,
     action: "planet",
     dice: null,
@@ -527,7 +539,7 @@ function createGame() {
     pendingSteal: null,
     criminalMover: null,
     privateMessages: [],
-    log: ["領界の準備が整いました。小都市と領界路を初期配置してください。"],
+    log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
     winner: null
   };
 }
@@ -613,6 +625,7 @@ function isCpuPlayer(state, playerId) {
   return Boolean((_state$players$player = state.players[playerId]) === null || _state$players$player === void 0 ? void 0 : _state$players$player.isCpu);
 }
 function phaseLabel(state) {
+  if (state.phase === "setup" && !state.orderLocked) return "順番決定待ち";
   if (state.phase === "setup") return "初期配置";
   if (state.turnStage === "roll") return "サイコロ";
   if (state.turnStage === "production") return "資源獲得";
@@ -838,6 +851,7 @@ function bestCpuCollectResource(state, playerId) {
 }
 function nextCpuEvent(state) {
   var _state$criminalMover, _state$pendingSteal;
+  if (state.phase === "setup" && !state.orderLocked) return null;
   if (state.action === "discard") {
     var cpuDiscard = pendingDiscardEntries(state).find(function (_ref10) {
       var _ref11 = _slicedToArray(_ref10, 1),
@@ -1270,7 +1284,9 @@ function moveTurn(state) {
     addLog(state, "".concat(winner.name, " \u304C10\u70B9\u306B\u5230\u9054\u3057\u307E\u3057\u305F\u3002"));
     return;
   }
-  state.turn = (state.turn + 1) % 4;
+  var order = state.turnOrder || [0, 1, 2, 3];
+  var index = order.indexOf(state.turn);
+  state.turn = order[(index + 1) % order.length];
   state.turnCount = (state.turnCount || 0) + 1;
   state.rolled = false;
   state.dice = null;
@@ -1290,6 +1306,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "setCpu") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
     var targetId = Number(event.targetId);
     var target = next.players[targetId];
     if (!target) return next;
@@ -1303,8 +1320,23 @@ function reducer(state, event) {
     }
     return next;
   }
+  if (event.type === "randomizeOrder") {
+    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    var order = randomTurnOrder();
+    next.turnOrder = order;
+    next.setupOrder = setupOrderFor(order);
+    next.turn = order[0];
+    next.orderLocked = true;
+    next.action = "planet";
+    addLog(next, "\u9806\u756A: ".concat(order.map(function (id) {
+      return next.players[id].name;
+    }).join(" → ")));
+    addLog(next, "".concat(next.players[order[0]].name, " \u304C\u5C0F\u90FD\u5E02\u3092\u914D\u7F6E\u3057\u307E\u3059\u3002"));
+    return next;
+  }
   if (event.type === "setAction") {
     if (["discard", "steal"].includes(next.action)) return next;
+    if (next.phase === "setup" && !next.orderLocked) return next;
     next.action = event.action;
     return next;
   }
@@ -1367,6 +1399,7 @@ function reducer(state, event) {
   if (event.type === "vertex") {
     var vertexId = event.vertexId;
     if (next.phase === "setup") {
+      if (!next.orderLocked) return next;
       var active = next.setupOrder[next.setupStep];
       if (actor !== active || next.action !== "planet" || !canBuildPlanet(next, vertexId, actor)) return next;
       next.buildings[vertexId] = {
@@ -1401,6 +1434,7 @@ function reducer(state, event) {
     var edgeId = event.edgeId;
     var free = event.free || next.action === "freeRoute";
     if (next.phase === "setup") {
+      if (!next.orderLocked) return next;
       var _active = next.setupOrder[next.setupStep];
       if (actor !== _active || next.action !== "route" || !canBuildRoute(next, edgeId, actor)) return next;
       next.routes[edgeId] = {
@@ -1418,11 +1452,11 @@ function reducer(state, event) {
       next.setupStep += 1;
       if (next.setupStep >= next.setupOrder.length) {
         next.phase = "play";
-        next.turn = 0;
+        next.turn = (next.turnOrder || [0, 1, 2, 3])[0];
         next.rolled = false;
         next.turnStage = "roll";
         next.action = "roll";
-        addLog(next, "初期配置完了。最初のプレイヤーからサイコロを振ります。");
+        addLog(next, "\u521D\u671F\u914D\u7F6E\u5B8C\u4E86\u3002".concat(next.players[next.turn].name, " \u304B\u3089\u30B5\u30A4\u30B3\u30ED\u3092\u632F\u308A\u307E\u3059\u3002"));
       } else {
         next.action = "planet";
         addLog(next, "".concat(next.players[next.setupOrder[next.setupStep]].name, " \u304C\u5C0F\u90FD\u5E02\u3092\u914D\u7F6E\u3057\u307E\u3059\u3002"));
@@ -1883,7 +1917,7 @@ function HelpPanel() {
     }
   }, "\u672A\u77E5\u3078\u306E\u65C5")), tab === "rules" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u30D7\u30EC\u30A4\u30E4\u30FC\u30AB\u30FC\u30C9\u304B\u3089CPU\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u30D7\u30EC\u30A4\u30E4\u30FC\u30AB\u30FC\u30C9\u304B\u3089CPU\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
   }, /*#__PURE__*/React.createElement("h2", null, "\u7528\u8A9E\u5BFE\u5FDC"), /*#__PURE__*/React.createElement("dl", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5C0F\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u57FA\u790E\u62E0\u70B9\u3002\u5EFA\u3066\u308B\u3068\u96A3\u63A5\u30BF\u30A4\u30EB\u304B\u3089\u8CC7\u6E90\u3092\u5F97\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5927\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u3092\u5F37\u5316\u3057\u305F\u62E0\u70B9\u3002\u7523\u51FA\u304C2\u500D\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u9818\u754C\u8DEF"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u540C\u58EB\u3092\u3064\u306A\u304E\u3001\u65B0\u3057\u3044\u5C0F\u90FD\u5E02\u3092\u7F6E\u304F\u305F\u3081\u306E\u63A5\u7D9A\u8DEF\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u6B21\u5143\u9580"), /*#__PURE__*/React.createElement("dd", null, "\u63A5\u3057\u3066\u3044\u308B\u3068\u901A\u4FE1\u4EA4\u6613\u304C\u6709\u5229\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30F4\u30A9\u30A4\u30C9"), /*#__PURE__*/React.createElement("dd", null, "\u8CC7\u6E90\u3092\u7523\u51FA\u3057\u306A\u3044\u7279\u6B8A\u30BF\u30A4\u30EB\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA"), /*#__PURE__*/React.createElement("dd", null, "\u3044\u308B\u30BF\u30A4\u30EB\u306E\u7523\u51FA\u3092\u6B62\u3081\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "TVA"), /*#__PURE__*/React.createElement("dd", null, "\u4F7F\u3046\u3068\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u52D5\u304B\u3057\u307E\u3059\u3002"))), /*#__PURE__*/React.createElement("h2", null, "\u8CC7\u6E90"), /*#__PURE__*/React.createElement("p", null, "\u9271\u7269\u6B21\u5143=\u30EC\u30A2\u30E1\u30BF\u30EB\u3001\u6A5F\u68B0\u6B21\u5143=\u30CA\u30CE\u30DE\u30B7\u30F3\u3001\u71B1\u5E2F\u6B21\u5143=\u5EFA\u6750\u3001\u5927\u8349\u539F=\u76AE\u9769\u3001\u80A5\u6C83\u306A\u5927\u5730=\u7A40\u7269\u3002")), tab === "cards" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
@@ -2027,7 +2061,7 @@ function Board(_ref28) {
     onEvent = _ref28.onEvent,
     myPlayerId = _ref28.myPlayerId;
   var active = currentPlayer(state).id;
-  var canClick = state.phase === "setup" ? active === myPlayerId : state.turn === myPlayerId;
+  var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
     viewBox: "0 0 720 680",
     className: "board",
@@ -2241,12 +2275,15 @@ function App() {
   }, [state, net.mode]);
   var me = state.players[myPlayerId];
   var active = currentPlayer(state);
-  var actionable = state.phase === "setup" ? active.id === myPlayerId : state.turn === myPlayerId;
+  var actionable = state.phase === "setup" ? state.orderLocked && active.id === myPlayerId : state.turn === myPlayerId;
   var mainActionable = actionable && isMainPhase(state);
   var currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
   var selectablePlayers = state.players.filter(function (player) {
     return !player.isCpu || player.id === myPlayerId;
   });
+  var turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
+    return state.players[id].name;
+  }).join(" → ");
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u3092\u5E83\u3052\u3001\u5927\u90FD\u5E02\u3078\u80B2\u3066\u300110\u70B9\u3092\u76EE\u6307\u30594\u4EBA\u7528\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002")), /*#__PURE__*/React.createElement("div", {
@@ -2274,6 +2311,8 @@ function App() {
   }, /*#__PURE__*/React.createElement("span", {
     className: "pill"
   }, "\u73FE\u5728: ", active.name), /*#__PURE__*/React.createElement("span", {
+    className: "pill"
+  }, "\u9806\u756A: ", state.orderLocked ? turnOrderText : "未決定"), /*#__PURE__*/React.createElement("span", {
     className: "pill"
   }, "\u30D5\u30A7\u30FC\u30BA: ", phaseLabel(state)), /*#__PURE__*/React.createElement("span", {
     className: "pill"
@@ -2309,6 +2348,16 @@ function App() {
   })), /*#__PURE__*/React.createElement("div", {
     className: "actions"
   }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: function onClick() {
+      return act({
+        type: "randomizeOrder"
+      });
+    },
+    disabled: state.phase !== "setup" || state.orderLocked || state.setupStep > 0
+  }, /*#__PURE__*/React.createElement(Shuffle, {
+    size: 18
+  }), " \u9806\u756A\u6C7A\u5B9A\u3057\u3066\u958B\u59CB"), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     onClick: function onClick() {
       return act({
@@ -2510,8 +2559,8 @@ function App() {
           isCpu: !player.isCpu
         });
       },
-      disabled: player.id === myPlayerId || net.mode === "guest",
-      title: player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
+      disabled: player.id === myPlayerId || net.mode === "guest" || state.orderLocked,
+      title: state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
     }, player.isCpu ? "CPU解除" : "CPUにする"));
   })), /*#__PURE__*/React.createElement("section", {
     className: "log"

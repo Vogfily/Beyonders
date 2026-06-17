@@ -29,6 +29,7 @@ const PLAYERS = [
   { id: 2, name: "Player C", color: "#f6b642" },
   { id: 3, name: "Player D", color: "#8b7cf6" },
 ];
+const DEFAULT_TURN_ORDER = PLAYERS.map((player) => player.id);
 
 const COSTS = {
   route: { rock: 1, material: 1 },
@@ -167,6 +168,14 @@ function shuffle(items, random) {
     [next[i], next[j]] = [next[j], next[i]];
   }
   return next;
+}
+
+function setupOrderFor(turnOrder) {
+  return [...turnOrder, ...[...turnOrder].reverse()];
+}
+
+function randomTurnOrder() {
+  return shuffle(DEFAULT_TURN_ORDER, Math.random);
 }
 
 function hexToPixel(q, r) {
@@ -364,6 +373,7 @@ function makeBoard(seedText) {
 function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
   const board = makeBoard(roomId);
   const neutron = board.tiles.find((tile) => tile.terrain === "desert")?.id ?? 9;
+  const turnOrder = DEFAULT_TURN_ORDER;
   return {
     id: roomId,
     board,
@@ -381,12 +391,14 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     routes: {},
     deck: shuffle(DEV_DECK, mulberry32(hashString(`${roomId}:deck`))),
     discard: [],
-    turn: 0,
+    turn: turnOrder[0],
+    turnOrder,
     turnCount: 0,
     phase: "setup",
     turnStage: "setup",
+    orderLocked: false,
     setupStep: 0,
-    setupOrder: [0, 1, 2, 3, 3, 2, 1, 0],
+    setupOrder: setupOrderFor(turnOrder),
     setupPendingVertex: null,
     action: "planet",
     dice: null,
@@ -398,7 +410,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     pendingSteal: null,
     criminalMover: null,
     privateMessages: [],
-    log: ["領界の準備が整いました。小都市と領界路を初期配置してください。"],
+    log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
     winner: null,
   };
 }
@@ -473,6 +485,7 @@ function isCpuPlayer(state, playerId) {
 }
 
 function phaseLabel(state) {
+  if (state.phase === "setup" && !state.orderLocked) return "順番決定待ち";
   if (state.phase === "setup") return "初期配置";
   if (state.turnStage === "roll") return "サイコロ";
   if (state.turnStage === "production") return "資源獲得";
@@ -605,6 +618,7 @@ function bestCpuCollectResource(state, playerId) {
 }
 
 function nextCpuEvent(state) {
+  if (state.phase === "setup" && !state.orderLocked) return null;
   if (state.action === "discard") {
     const cpuDiscard = pendingDiscardEntries(state).find(([playerId]) => isCpuPlayer(state, Number(playerId)));
     if (cpuDiscard) {
@@ -880,7 +894,9 @@ function moveTurn(state) {
     addLog(state, `${winner.name} が10点に到達しました。`);
     return;
   }
-  state.turn = (state.turn + 1) % 4;
+  const order = state.turnOrder || [0, 1, 2, 3];
+  const index = order.indexOf(state.turn);
+  state.turn = order[(index + 1) % order.length];
   state.turnCount = (state.turnCount || 0) + 1;
   state.rolled = false;
   state.dice = null;
@@ -901,6 +917,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "setCpu") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
     const targetId = Number(event.targetId);
     const target = next.players[targetId];
     if (!target) return next;
@@ -914,8 +931,21 @@ function reducer(state, event) {
     }
     return next;
   }
+  if (event.type === "randomizeOrder") {
+    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    const order = randomTurnOrder();
+    next.turnOrder = order;
+    next.setupOrder = setupOrderFor(order);
+    next.turn = order[0];
+    next.orderLocked = true;
+    next.action = "planet";
+    addLog(next, `順番: ${order.map((id) => next.players[id].name).join(" → ")}`);
+    addLog(next, `${next.players[order[0]].name} が小都市を配置します。`);
+    return next;
+  }
   if (event.type === "setAction") {
     if (["discard", "steal"].includes(next.action)) return next;
+    if (next.phase === "setup" && !next.orderLocked) return next;
     next.action = event.action;
     return next;
   }
@@ -976,6 +1006,7 @@ function reducer(state, event) {
   if (event.type === "vertex") {
     const vertexId = event.vertexId;
     if (next.phase === "setup") {
+      if (!next.orderLocked) return next;
       const active = next.setupOrder[next.setupStep];
       if (actor !== active || next.action !== "planet" || !canBuildPlanet(next, vertexId, actor)) return next;
       next.buildings[vertexId] = { player: actor, type: "planet" };
@@ -1004,6 +1035,7 @@ function reducer(state, event) {
     const edgeId = event.edgeId;
     const free = event.free || next.action === "freeRoute";
     if (next.phase === "setup") {
+      if (!next.orderLocked) return next;
       const active = next.setupOrder[next.setupStep];
       if (actor !== active || next.action !== "route" || !canBuildRoute(next, edgeId, actor)) return next;
       next.routes[edgeId] = { player: actor };
@@ -1016,11 +1048,11 @@ function reducer(state, event) {
       next.setupStep += 1;
       if (next.setupStep >= next.setupOrder.length) {
         next.phase = "play";
-        next.turn = 0;
+        next.turn = (next.turnOrder || [0, 1, 2, 3])[0];
         next.rolled = false;
         next.turnStage = "roll";
         next.action = "roll";
-        addLog(next, "初期配置完了。最初のプレイヤーからサイコロを振ります。");
+        addLog(next, `初期配置完了。${next.players[next.turn].name} からサイコロを振ります。`);
       } else {
         next.action = "planet";
         addLog(next, `${next.players[next.setupOrder[next.setupStep]].name} が小都市を配置します。`);
@@ -1442,6 +1474,7 @@ function HelpPanel() {
           <h2>遊び方</h2>
           <p>サイコロで資源を得て、小都市、大都市、領界路を広げます。10 VPに到達したプレイヤーが勝利です。</p>
           <ul>
+            <li>参加者とCPU枠を決めてから、順番決定ボタンでプレイヤー順をランダムに決めます。</li>
             <li>初期配置では各プレイヤーが小都市と領界路を2セット置きます。</li>
             <li>自分の番はサイコロ、資源獲得、メインフェーズの順に進みます。</li>
             <li>メインフェーズでは交換、建設、未知への旅、交渉を行えます。</li>
@@ -1573,7 +1606,7 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
 
 function Board({ state, onEvent, myPlayerId }) {
   const active = currentPlayer(state).id;
-  const canClick = state.phase === "setup" ? active === myPlayerId : state.turn === myPlayerId;
+  const canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return (
     <svg viewBox="0 0 720 680" className="board" role="img" aria-label="宇宙資源盤面">
       <defs>
@@ -1697,10 +1730,11 @@ function App() {
 
   const me = state.players[myPlayerId];
   const active = currentPlayer(state);
-  const actionable = state.phase === "setup" ? active.id === myPlayerId : state.turn === myPlayerId;
+  const actionable = state.phase === "setup" ? state.orderLocked && active.id === myPlayerId : state.turn === myPlayerId;
   const mainActionable = actionable && isMainPhase(state);
   const currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
   const selectablePlayers = state.players.filter((player) => !player.isCpu || player.id === myPlayerId);
+  const turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ");
 
   return (
     <main>
@@ -1728,6 +1762,7 @@ function App() {
         <div className="playSurface">
           <div className="statusLine">
             <span className="pill">現在: {active.name}</span>
+            <span className="pill">順番: {state.orderLocked ? turnOrderText : "未決定"}</span>
             <span className="pill">フェーズ: {phaseLabel(state)}</span>
             <span className="pill">操作: {BUILD_LABEL[state.action] || (state.action === "criminal" ? "ラヴェジャーズ" : state.action === "discard" ? "資源廃棄" : state.action === "steal" ? "資源奪取" : state.action)}</span>
             {state.dice && <span className="pill">出目: {state.dice.join(" + ")} = {state.dice[0] + state.dice[1]}</span>}
@@ -1751,6 +1786,9 @@ function App() {
           </div>
 
           <div className="actions">
+            <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>
+              <Shuffle size={18} /> 順番決定して開始
+            </button>
             <button className="primary" onClick={() => act({ type: "roll" })} disabled={!actionable || state.phase !== "play" || state.rolled}>
               <Dice5 size={18} /> サイコロ
             </button>
@@ -1850,8 +1888,8 @@ function App() {
             <button
               className="cpuToggle"
               onClick={() => act({ type: "setCpu", targetId: player.id, isCpu: !player.isCpu })}
-              disabled={player.id === myPlayerId || net.mode === "guest"}
-              title={player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
+              disabled={player.id === myPlayerId || net.mode === "guest" || state.orderLocked}
+              title={state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
             >
               {player.isCpu ? "CPU解除" : "CPUにする"}
             </button>
