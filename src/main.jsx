@@ -1251,6 +1251,27 @@ function Cost({ cost }) {
   );
 }
 
+function ResourceHand({ player }) {
+  const total = totalResources(player.resources);
+  return (
+    <div className="resourceHand">
+      <div className="resourceHandHeader">
+        <h2>所持資源</h2>
+        <span>{total}枚</span>
+      </div>
+      <div className="resourceTiles">
+        {RESOURCE_KEYS.map((key) => (
+          <div key={key} className="resourceTile" style={{ "--resource": RESOURCES[key].color }}>
+            <span className="resourceName">{RESOURCES[key].name}</span>
+            <strong>{player.resources[key] || 0}</strong>
+            <small>{RESOURCES[key].terrain}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ResourceBundleInput({ title, value, onChange }) {
   return (
     <div className="bundleInput">
@@ -1784,6 +1805,8 @@ function App() {
             </label>
             <input value={me.name} onChange={(e) => act({ type: "rename", name: e.target.value })} disabled={me.isCpu} />
           </div>
+
+          <ResourceHand player={me} />
 
           <div className="actions">
             <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>

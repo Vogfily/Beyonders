@@ -239,6 +239,74 @@ h2 {
   flex: 1;
 }
 
+.resourceHand {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.resourceHandHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.resourceHandHeader h2 {
+  margin: 0;
+}
+
+.resourceHandHeader span {
+  min-width: 48px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #101827;
+  background: #dff7ff;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.resourceTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.resourceTile {
+  display: grid;
+  min-height: 78px;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 7px solid var(--resource);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.resourceName {
+  color: #f8fbff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.resourceTile strong {
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.resourceTile small {
+  overflow: hidden;
+  color: #b9c6da;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .actions button {
   flex: 1 1 140px;
 }

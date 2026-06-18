@@ -1667,10 +1667,31 @@ function Cost(_ref20) {
     }, RESOURCES[key].name, " ", value);
   }));
 }
-function ResourceBundleInput(_ref23) {
-  var title = _ref23.title,
-    value = _ref23.value,
-    _onChange = _ref23.onChange;
+function ResourceHand(_ref23) {
+  var player = _ref23.player;
+  var total = totalResources(player.resources);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "resourceHand"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "resourceHandHeader"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u6240\u6301\u8CC7\u6E90"), /*#__PURE__*/React.createElement("span", null, total, "\u679A")), /*#__PURE__*/React.createElement("div", {
+    className: "resourceTiles"
+  }, RESOURCE_KEYS.map(function (key) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      className: "resourceTile",
+      style: {
+        "--resource": RESOURCES[key].color
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "resourceName"
+    }, RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
+  })));
+}
+function ResourceBundleInput(_ref24) {
+  var title = _ref24.title,
+    value = _ref24.value,
+    _onChange = _ref24.onChange;
   return /*#__PURE__*/React.createElement("div", {
     className: "bundleInput"
   }, /*#__PURE__*/React.createElement("h3", null, title), RESOURCE_KEYS.map(function (key) {
@@ -1690,11 +1711,11 @@ function ResourceBundleInput(_ref23) {
 function emptyBundle() {
   return emptyResources(0);
 }
-function NegotiationPanel(_ref24) {
+function NegotiationPanel(_ref25) {
   var _humanPartners$0$id, _humanPartners$, _state$players$select;
-  var state = _ref24.state,
-    myPlayerId = _ref24.myPlayerId,
-    onEvent = _ref24.onEvent;
+  var state = _ref25.state,
+    myPlayerId = _ref25.myPlayerId,
+    onEvent = _ref25.onEvent;
   var _useState = useState((myPlayerId + 1) % 4),
     _useState2 = _slicedToArray(_useState, 2),
     partnerId = _useState2[0],
@@ -1820,11 +1841,11 @@ function NegotiationPanel(_ref24) {
     }, line);
   }))));
 }
-function CriminalPanel(_ref25) {
+function CriminalPanel(_ref26) {
   var _state$pendingDiscard2;
-  var state = _ref25.state,
-    myPlayerId = _ref25.myPlayerId,
-    onEvent = _ref25.onEvent;
+  var state = _ref26.state,
+    myPlayerId = _ref26.myPlayerId,
+    onEvent = _ref26.onEvent;
   var _useState7 = useState(emptyBundle),
     _useState8 = _slicedToArray(_useState7, 2),
     discardBundle = _useState8[0],
@@ -1834,10 +1855,10 @@ function CriminalPanel(_ref25) {
     victimId = _useState0[0],
     setVictimId = _useState0[1];
   var need = Number(((_state$pendingDiscard2 = state.pendingDiscards) === null || _state$pendingDiscard2 === void 0 ? void 0 : _state$pendingDiscard2[myPlayerId]) || 0);
-  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref26) {
-    var _ref27 = _slicedToArray(_ref26, 2),
-      playerId = _ref27[0],
-      needCount = _ref27[1];
+  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref27) {
+    var _ref28 = _slicedToArray(_ref27, 2),
+      playerId = _ref28[0],
+      needCount = _ref28[1];
     return "".concat(state.players[playerId].name, ":").concat(needCount, "\u679A");
   });
   var pendingSteal = state.pendingSteal;
@@ -2056,10 +2077,10 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     send: send
   };
 }
-function Board(_ref28) {
-  var state = _ref28.state,
-    onEvent = _ref28.onEvent,
-    myPlayerId = _ref28.myPlayerId;
+function Board(_ref29) {
+  var state = _ref29.state,
+    onEvent = _ref29.onEvent,
+    myPlayerId = _ref29.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2345,7 +2366,9 @@ function App() {
       });
     },
     disabled: me.isCpu
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(ResourceHand, {
+    player: me
+  }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "primary",
