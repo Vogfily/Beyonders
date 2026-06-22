@@ -109,29 +109,10 @@ const TILE_SETUP = [
   "food",
   "nano",
 ];
-const RESOURCE_TILE_SETUP = TILE_SETUP.filter((tile) => tile !== "desert");
-const FIXED_NUMBER_BY_TILE = {
-  1: 11,
-  2: 12,
-  3: 9,
-  4: 4,
-  5: 6,
-  6: 5,
-  7: 10,
-  8: null,
-  9: 3,
-  10: 11,
-  11: 4,
-  12: 8,
-  13: 8,
-  14: 10,
-  15: 9,
-  16: 3,
-  17: 5,
-  18: 2,
-  19: 6,
-};
-const NEUTRON_TILE_NUMBER = 8;
+// Number chips follow the familiar Catan spiral. The Void is randomized, and its
+// position simply consumes no chip, leaving all 18 chips in this order.
+const NUMBER_CHIP_TILE_ORDER = [1, 4, 8, 13, 17, 18, 19, 16, 12, 7, 3, 2, 5, 9, 14, 15, 11, 6, 10];
+const NUMBER_CHIP_ORDER = [5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 3, 4, 5, 6, 11];
 const HEX_COORDS = [];
 for (let q = -2; q <= 2; q += 1) {
   const r1 = Math.max(-2, -q - 2);
@@ -291,14 +272,22 @@ function visualTileNumberMap() {
 function makeBoard(seedText) {
   const random = mulberry32(hashString(seedText));
   const boardNumbers = visualTileNumberMap();
-  const shuffledResources = shuffle(RESOURCE_TILE_SETUP, random);
+  const shuffledTerrains = shuffle(TILE_SETUP, random);
+  const voidTileNumber = Array.from(boardNumbers.entries()).find(([, number]) => shuffledTerrains[number - 1] === "desert")?.[1];
+  const numberByTile = {};
+  let chipIndex = 0;
+  NUMBER_CHIP_TILE_ORDER.forEach((tileNumber) => {
+    if (tileNumber === voidTileNumber) return;
+    numberByTile[tileNumber] = NUMBER_CHIP_ORDER[chipIndex];
+    chipIndex += 1;
+  });
   const vertices = new Map();
   const edges = new Map();
   const tiles = HEX_COORDS.map((coord, index) => {
     const center = hexToPixel(coord.q, coord.r);
     const boardNumber = boardNumbers.get(`${coord.q}:${coord.r}`);
-    const terrain = boardNumber === NEUTRON_TILE_NUMBER ? "desert" : shuffledResources.pop();
-    const number = FIXED_NUMBER_BY_TILE[boardNumber] ?? null;
+    const terrain = shuffledTerrains[boardNumber - 1];
+    const number = numberByTile[boardNumber] ?? null;
     const corners = Array.from({ length: 6 }, (_, i) => {
       const angle = (Math.PI / 180) * (60 * i - 30);
       const point = {

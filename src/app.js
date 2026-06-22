@@ -1,14 +1,14 @@
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
-function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
-function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
 function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
 function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -206,31 +206,10 @@ var BUILD_LABEL = {
   frontier: "未知への旅"
 };
 var TILE_SETUP = ["material", "nano", "rock", "food", "rare", "rock", "food", "material", "nano", "desert", "material", "rare", "material", "food", "nano", "rock", "rare", "food", "nano"];
-var RESOURCE_TILE_SETUP = TILE_SETUP.filter(function (tile) {
-  return tile !== "desert";
-});
-var FIXED_NUMBER_BY_TILE = {
-  1: 11,
-  2: 12,
-  3: 9,
-  4: 4,
-  5: 6,
-  6: 5,
-  7: 10,
-  8: null,
-  9: 3,
-  10: 11,
-  11: 4,
-  12: 8,
-  13: 8,
-  14: 10,
-  15: 9,
-  16: 3,
-  17: 5,
-  18: 2,
-  19: 6
-};
-var NEUTRON_TILE_NUMBER = 8;
+// Number chips follow the familiar Catan spiral. The Void is randomized, and its
+// position simply consumes no chip, leaving all 18 chips in this order.
+var NUMBER_CHIP_TILE_ORDER = [1, 4, 8, 13, 17, 18, 19, 16, 12, 7, 3, 2, 5, 9, 14, 15, 11, 6, 10];
+var NUMBER_CHIP_ORDER = [5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 3, 4, 5, 6, 11];
 var HEX_COORDS = [];
 for (var q = -2; q <= 2; q += 1) {
   var r1 = Math.max(-2, -q - 2);
@@ -385,17 +364,30 @@ function visualTileNumberMap() {
   }));
 }
 function makeBoard(seedText) {
+  var _Array$from$find;
   var random = mulberry32(hashString(seedText));
   var boardNumbers = visualTileNumberMap();
-  var shuffledResources = shuffle(RESOURCE_TILE_SETUP, random);
+  var shuffledTerrains = shuffle(TILE_SETUP, random);
+  var voidTileNumber = (_Array$from$find = Array.from(boardNumbers.entries()).find(function (_ref3) {
+    var _ref4 = _slicedToArray(_ref3, 2),
+      number = _ref4[1];
+    return shuffledTerrains[number - 1] === "desert";
+  })) === null || _Array$from$find === void 0 ? void 0 : _Array$from$find[1];
+  var numberByTile = {};
+  var chipIndex = 0;
+  NUMBER_CHIP_TILE_ORDER.forEach(function (tileNumber) {
+    if (tileNumber === voidTileNumber) return;
+    numberByTile[tileNumber] = NUMBER_CHIP_ORDER[chipIndex];
+    chipIndex += 1;
+  });
   var vertices = new Map();
   var edges = new Map();
   var tiles = HEX_COORDS.map(function (coord, index) {
-    var _FIXED_NUMBER_BY_TILE;
+    var _numberByTile$boardNu;
     var center = hexToPixel(coord.q, coord.r);
     var boardNumber = boardNumbers.get("".concat(coord.q, ":").concat(coord.r));
-    var terrain = boardNumber === NEUTRON_TILE_NUMBER ? "desert" : shuffledResources.pop();
-    var number = (_FIXED_NUMBER_BY_TILE = FIXED_NUMBER_BY_TILE[boardNumber]) !== null && _FIXED_NUMBER_BY_TILE !== void 0 ? _FIXED_NUMBER_BY_TILE : null;
+    var terrain = shuffledTerrains[boardNumber - 1];
+    var number = (_numberByTile$boardNu = numberByTile[boardNumber]) !== null && _numberByTile$boardNu !== void 0 ? _numberByTile$boardNu : null;
     var corners = Array.from({
       length: 6
     }, function (_, i) {
@@ -482,10 +474,10 @@ function makeBoard(seedText) {
     vertices: vertexList,
     edges: edgeList,
     spaceports: spaceports,
-    adjacency: Object.fromEntries(Object.entries(adjacency).map(function (_ref3) {
-      var _ref4 = _slicedToArray(_ref3, 2),
-        k = _ref4[0],
-        v = _ref4[1];
+    adjacency: Object.fromEntries(Object.entries(adjacency).map(function (_ref5) {
+      var _ref6 = _slicedToArray(_ref5, 2),
+        k = _ref6[0],
+        v = _ref6[1];
       return [k, _toConsumableArray(v)];
     })),
     incidentEdges: incidentEdges
@@ -544,18 +536,18 @@ function createGame() {
   };
 }
 function canAfford(player, cost) {
-  return Object.entries(cost).every(function (_ref5) {
-    var _ref6 = _slicedToArray(_ref5, 2),
-      key = _ref6[0],
-      amount = _ref6[1];
+  return Object.entries(cost).every(function (_ref7) {
+    var _ref8 = _slicedToArray(_ref7, 2),
+      key = _ref8[0],
+      amount = _ref8[1];
     return (player.resources[key] || 0) >= amount;
   });
 }
 function pay(player, cost) {
-  Object.entries(cost).forEach(function (_ref7) {
-    var _ref8 = _slicedToArray(_ref7, 2),
-      key = _ref8[0],
-      amount = _ref8[1];
+  Object.entries(cost).forEach(function (_ref9) {
+    var _ref0 = _slicedToArray(_ref9, 2),
+      key = _ref0[0],
+      amount = _ref0[1];
     player.resources[key] -= amount;
   });
 }
@@ -584,10 +576,10 @@ function publicPlayedFrontiers(player) {
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
-  return Object.entries(counts).map(function (_ref9) {
-    var _ref0 = _slicedToArray(_ref9, 2),
-      type = _ref0[0],
-      count = _ref0[1];
+  return Object.entries(counts).map(function (_ref1) {
+    var _ref10 = _slicedToArray(_ref1, 2),
+      type = _ref10[0],
+      count = _ref10[1];
     return "".concat(DEV_NAMES[type]).concat(count);
   }).join(" / ");
 }
@@ -734,7 +726,7 @@ function discardForCpu(player, need) {
   return bundle;
 }
 function bestCriminalTile(state, actor) {
-  var _ref1, _candidates$0$id, _candidates$, _state$board$tiles$fi;
+  var _ref11, _candidates$0$id, _candidates$, _state$board$tiles$fi;
   var leaderIds = state.players.filter(function (player) {
     return player.id !== actor;
   }).map(function (player) {
@@ -770,9 +762,9 @@ function bestCriminalTile(state, actor) {
   }).sort(function (a, b) {
     return b.score - a.score;
   });
-  return (_ref1 = (_candidates$0$id = (_candidates$ = candidates[0]) === null || _candidates$ === void 0 ? void 0 : _candidates$.id) !== null && _candidates$0$id !== void 0 ? _candidates$0$id : (_state$board$tiles$fi = state.board.tiles.find(function (tile) {
+  return (_ref11 = (_candidates$0$id = (_candidates$ = candidates[0]) === null || _candidates$ === void 0 ? void 0 : _candidates$.id) !== null && _candidates$0$id !== void 0 ? _candidates$0$id : (_state$board$tiles$fi = state.board.tiles.find(function (tile) {
     return tile.id !== state.criminalTile;
-  })) === null || _state$board$tiles$fi === void 0 ? void 0 : _state$board$tiles$fi.id) !== null && _ref1 !== void 0 ? _ref1 : state.criminalTile;
+  })) === null || _state$board$tiles$fi === void 0 ? void 0 : _state$board$tiles$fi.id) !== null && _ref11 !== void 0 ? _ref11 : state.criminalTile;
 }
 function bestStealVictim(state, victimIds) {
   var _map$sort$0$id, _map$sort$;
@@ -853,9 +845,9 @@ function nextCpuEvent(state) {
   var _state$criminalMover, _state$pendingSteal;
   if (state.phase === "setup" && !state.orderLocked) return null;
   if (state.action === "discard") {
-    var cpuDiscard = pendingDiscardEntries(state).find(function (_ref10) {
-      var _ref11 = _slicedToArray(_ref10, 1),
-        playerId = _ref11[0];
+    var cpuDiscard = pendingDiscardEntries(state).find(function (_ref12) {
+      var _ref13 = _slicedToArray(_ref12, 1),
+        playerId = _ref13[0];
       return isCpuPlayer(state, Number(playerId));
     });
     if (cpuDiscard) {
@@ -1025,9 +1017,9 @@ function discardRequirement(player) {
   return total >= 8 ? Math.floor(total / 2) : 0;
 }
 function pendingDiscardEntries(state) {
-  return Object.entries(state.pendingDiscards || {}).filter(function (_ref12) {
-    var _ref13 = _slicedToArray(_ref12, 2),
-      value = _ref13[1];
+  return Object.entries(state.pendingDiscards || {}).filter(function (_ref14) {
+    var _ref15 = _slicedToArray(_ref14, 2),
+      value = _ref15[1];
     return value > 0;
   });
 }
@@ -1146,13 +1138,13 @@ function isBlockedVertex(state, vertexId, playerId) {
   return building && building.player !== playerId;
 }
 function longestRouteLength(state, playerId) {
-  var ownEdges = new Set(Object.entries(state.routes).filter(function (_ref14) {
-    var _ref15 = _slicedToArray(_ref14, 2),
-      route = _ref15[1];
+  var ownEdges = new Set(Object.entries(state.routes).filter(function (_ref16) {
+    var _ref17 = _slicedToArray(_ref16, 2),
+      route = _ref17[1];
     return route.player === playerId;
-  }).map(function (_ref16) {
-    var _ref17 = _slicedToArray(_ref16, 1),
-      edgeId = _ref17[0];
+  }).map(function (_ref18) {
+    var _ref19 = _slicedToArray(_ref18, 1),
+      edgeId = _ref19[0];
     return edgeId;
   }));
   if (!ownEdges.size) return 0;
@@ -1245,9 +1237,9 @@ function produce(state, total) {
   if (total === 7) {
     var pending = Object.fromEntries(state.players.map(function (player) {
       return [player.id, discardRequirement(player)];
-    }).filter(function (_ref18) {
-      var _ref19 = _slicedToArray(_ref18, 2),
-        need = _ref19[1];
+    }).filter(function (_ref20) {
+      var _ref21 = _slicedToArray(_ref20, 2),
+        need = _ref21[1];
       return need > 0;
     }));
     state.pendingDiscards = pending;
@@ -1651,14 +1643,14 @@ function tileName(tile) {
   if (tile.terrain === "desert") return "ヴォイド";
   return RESOURCES[tile.terrain].terrain;
 }
-function Cost(_ref20) {
-  var cost = _ref20.cost;
+function Cost(_ref22) {
+  var cost = _ref22.cost;
   return /*#__PURE__*/React.createElement("span", {
     className: "cost"
-  }, Object.entries(cost).map(function (_ref21) {
-    var _ref22 = _slicedToArray(_ref21, 2),
-      key = _ref22[0],
-      value = _ref22[1];
+  }, Object.entries(cost).map(function (_ref23) {
+    var _ref24 = _slicedToArray(_ref23, 2),
+      key = _ref24[0],
+      value = _ref24[1];
     return /*#__PURE__*/React.createElement("span", {
       key: key,
       style: {
@@ -1667,8 +1659,8 @@ function Cost(_ref20) {
     }, RESOURCES[key].name, " ", value);
   }));
 }
-function ResourceHand(_ref23) {
-  var player = _ref23.player;
+function ResourceHand(_ref25) {
+  var player = _ref25.player;
   var total = totalResources(player.resources);
   return /*#__PURE__*/React.createElement("div", {
     className: "resourceHand"
@@ -1688,10 +1680,10 @@ function ResourceHand(_ref23) {
     }, RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
   })));
 }
-function ResourceBundleInput(_ref24) {
-  var title = _ref24.title,
-    value = _ref24.value,
-    _onChange = _ref24.onChange;
+function ResourceBundleInput(_ref26) {
+  var title = _ref26.title,
+    value = _ref26.value,
+    _onChange = _ref26.onChange;
   return /*#__PURE__*/React.createElement("div", {
     className: "bundleInput"
   }, /*#__PURE__*/React.createElement("h3", null, title), RESOURCE_KEYS.map(function (key) {
@@ -1711,11 +1703,11 @@ function ResourceBundleInput(_ref24) {
 function emptyBundle() {
   return emptyResources(0);
 }
-function NegotiationPanel(_ref25) {
+function NegotiationPanel(_ref27) {
   var _humanPartners$0$id, _humanPartners$, _state$players$select;
-  var state = _ref25.state,
-    myPlayerId = _ref25.myPlayerId,
-    onEvent = _ref25.onEvent;
+  var state = _ref27.state,
+    myPlayerId = _ref27.myPlayerId,
+    onEvent = _ref27.onEvent;
   var _useState = useState((myPlayerId + 1) % 4),
     _useState2 = _slicedToArray(_useState, 2),
     partnerId = _useState2[0],
@@ -1841,11 +1833,11 @@ function NegotiationPanel(_ref25) {
     }, line);
   }))));
 }
-function CriminalPanel(_ref26) {
+function CriminalPanel(_ref28) {
   var _state$pendingDiscard2;
-  var state = _ref26.state,
-    myPlayerId = _ref26.myPlayerId,
-    onEvent = _ref26.onEvent;
+  var state = _ref28.state,
+    myPlayerId = _ref28.myPlayerId,
+    onEvent = _ref28.onEvent;
   var _useState7 = useState(emptyBundle),
     _useState8 = _slicedToArray(_useState7, 2),
     discardBundle = _useState8[0],
@@ -1855,10 +1847,10 @@ function CriminalPanel(_ref26) {
     victimId = _useState0[0],
     setVictimId = _useState0[1];
   var need = Number(((_state$pendingDiscard2 = state.pendingDiscards) === null || _state$pendingDiscard2 === void 0 ? void 0 : _state$pendingDiscard2[myPlayerId]) || 0);
-  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref27) {
-    var _ref28 = _slicedToArray(_ref27, 2),
-      playerId = _ref28[0],
-      needCount = _ref28[1];
+  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref29) {
+    var _ref30 = _slicedToArray(_ref29, 2),
+      playerId = _ref30[0],
+      needCount = _ref30[1];
     return "".concat(state.players[playerId].name, ":").concat(needCount, "\u679A");
   });
   var pendingSteal = state.pendingSteal;
@@ -2077,10 +2069,10 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     send: send
   };
 }
-function Board(_ref29) {
-  var state = _ref29.state,
-    onEvent = _ref29.onEvent,
-    myPlayerId = _ref29.myPlayerId;
+function Board(_ref31) {
+  var state = _ref31.state,
+    onEvent = _ref31.onEvent,
+    myPlayerId = _ref31.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
