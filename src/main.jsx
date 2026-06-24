@@ -269,16 +269,18 @@ function visualTileNumberMap() {
   );
 }
 
-function makeBoard(seedText) {
-  const random = mulberry32(hashString(seedText));
+function makeBoard(seedText, gameMode = "normal") {
+  const random = mulberry32(hashString(`${seedText}:${gameMode}`));
   const boardNumbers = visualTileNumberMap();
   const shuffledTerrains = shuffle(TILE_SETUP, random);
   const voidTileNumber = Array.from(boardNumbers.entries()).find(([, number]) => shuffledTerrains[number - 1] === "desert")?.[1];
   const numberByTile = {};
   let chipIndex = 0;
-  NUMBER_CHIP_TILE_ORDER.forEach((tileNumber) => {
+  const chipTileOrder = gameMode === "hard" ? shuffle(NUMBER_CHIP_TILE_ORDER, random) : NUMBER_CHIP_TILE_ORDER;
+  const chips = gameMode === "hard" ? shuffle(NUMBER_CHIP_ORDER, random) : NUMBER_CHIP_ORDER;
+  chipTileOrder.forEach((tileNumber) => {
     if (tileNumber === voidTileNumber) return;
-    numberByTile[tileNumber] = NUMBER_CHIP_ORDER[chipIndex];
+    numberByTile[tileNumber] = chips[chipIndex];
     chipIndex += 1;
   });
   const vertices = new Map();
@@ -360,7 +362,8 @@ function makeBoard(seedText) {
 }
 
 function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
-  const board = makeBoard(roomId);
+  const gameMode = "normal";
+  const board = makeBoard(roomId, gameMode);
   const neutron = board.tiles.find((tile) => tile.terrain === "desert")?.id ?? 9;
   const turnOrder = DEFAULT_TURN_ORDER;
   return {
@@ -385,6 +388,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     turnCount: 0,
     phase: "setup",
     turnStage: "setup",
+    gameMode,
     orderLocked: false,
     setupStep: 0,
     setupOrder: setupOrderFor(turnOrder),
@@ -918,6 +922,18 @@ function reducer(state, event) {
       target.name = target.name.startsWith("CPU") ? `Player ${targetId + 1}` : target.name;
       addLog(next, `${target.name} がプレイヤー枠に戻りました。`);
     }
+    return next;
+  }
+  if (event.type === "setGameMode") {
+    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    const gameMode = event.gameMode === "hard" ? "hard" : "normal";
+    if (next.gameMode === gameMode) return next;
+    next.gameMode = gameMode;
+    next.board = makeBoard(next.id, gameMode);
+    const voidTile = next.board.tiles.find((tile) => tile.terrain === "desert");
+    next.criminalTile = voidTile?.id ?? 0;
+    next.selectedTile = next.criminalTile;
+    addLog(next, `${gameMode === "hard" ? "ハード" : "ノーマル"}モードの盤面に切り替えました。`);
     return next;
   }
   if (event.type === "randomizeOrder") {
@@ -1484,7 +1500,8 @@ function HelpPanel() {
           <h2>遊び方</h2>
           <p>サイコロで資源を得て、小都市、大都市、領界路を広げます。10 VPに到達したプレイヤーが勝利です。</p>
           <ul>
-            <li>参加者とCPU枠を決めてから、順番決定ボタンでプレイヤー順をランダムに決めます。</li>
+            <li>参加者とCPU枠、ゲームモードを決めてから、順番決定ボタンでプレイヤー順をランダムに決めます。</li>
+            <li>ノーマルは地形をランダム、数字は決められた順に配置します。ハードはヴォイドを含む地形と数字をすべてランダムに配置します。</li>
             <li>初期配置では各プレイヤーが小都市と領界路を2セット置きます。</li>
             <li>自分の番はサイコロ、資源獲得、メインフェーズの順に進みます。</li>
             <li>メインフェーズでは交換、建設、未知への旅、交渉を行えます。</li>
@@ -1773,6 +1790,7 @@ function App() {
           <div className="statusLine">
             <span className="pill">現在: {active.name}</span>
             <span className="pill">順番: {state.orderLocked ? turnOrderText : "未決定"}</span>
+            <span className="pill">モード: {state.gameMode === "hard" ? "ハード" : "ノーマル"}</span>
             <span className="pill">フェーズ: {phaseLabel(state)}</span>
             <span className="pill">操作: {BUILD_LABEL[state.action] || (state.action === "criminal" ? "ラヴェジャーズ" : state.action === "discard" ? "資源廃棄" : state.action === "steal" ? "資源奪取" : state.action)}</span>
             {state.dice && <span className="pill">出目: {state.dice.join(" + ")} = {state.dice[0] + state.dice[1]}</span>}
@@ -1798,6 +1816,24 @@ function App() {
           <ResourceHand player={me} />
 
           <div className="actions">
+            <div className="modeChooser" aria-label="ゲームモード">
+              <button
+                className={state.gameMode === "normal" ? "selected" : ""}
+                onClick={() => act({ type: "setGameMode", gameMode: "normal" })}
+                disabled={state.phase !== "setup" || state.orderLocked}
+                title="数字の並び順を固定した標準盤面"
+              >
+                ノーマル
+              </button>
+              <button
+                className={state.gameMode === "hard" ? "selected" : ""}
+                onClick={() => act({ type: "setGameMode", gameMode: "hard" })}
+                disabled={state.phase !== "setup" || state.orderLocked}
+                title="地形と数字をすべてランダムにした盤面"
+              >
+                ハード
+              </button>
+            </div>
             <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>
               <Shuffle size={18} /> 順番決定して開始
             </button>

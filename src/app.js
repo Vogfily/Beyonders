@@ -365,7 +365,8 @@ function visualTileNumberMap() {
 }
 function makeBoard(seedText) {
   var _Array$from$find;
-  var random = mulberry32(hashString(seedText));
+  var gameMode = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "normal";
+  var random = mulberry32(hashString("".concat(seedText, ":").concat(gameMode)));
   var boardNumbers = visualTileNumberMap();
   var shuffledTerrains = shuffle(TILE_SETUP, random);
   var voidTileNumber = (_Array$from$find = Array.from(boardNumbers.entries()).find(function (_ref3) {
@@ -375,9 +376,11 @@ function makeBoard(seedText) {
   })) === null || _Array$from$find === void 0 ? void 0 : _Array$from$find[1];
   var numberByTile = {};
   var chipIndex = 0;
-  NUMBER_CHIP_TILE_ORDER.forEach(function (tileNumber) {
+  var chipTileOrder = gameMode === "hard" ? shuffle(NUMBER_CHIP_TILE_ORDER, random) : NUMBER_CHIP_TILE_ORDER;
+  var chips = gameMode === "hard" ? shuffle(NUMBER_CHIP_ORDER, random) : NUMBER_CHIP_ORDER;
+  chipTileOrder.forEach(function (tileNumber) {
     if (tileNumber === voidTileNumber) return;
-    numberByTile[tileNumber] = NUMBER_CHIP_ORDER[chipIndex];
+    numberByTile[tileNumber] = chips[chipIndex];
     chipIndex += 1;
   });
   var vertices = new Map();
@@ -486,7 +489,8 @@ function makeBoard(seedText) {
 function createGame() {
   var _board$tiles$find$id, _board$tiles$find;
   var roomId = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : crypto.randomUUID().slice(0, 8);
-  var board = makeBoard(roomId);
+  var gameMode = "normal";
+  var board = makeBoard(roomId, gameMode);
   var neutron = (_board$tiles$find$id = (_board$tiles$find = board.tiles.find(function (tile) {
     return tile.terrain === "desert";
   })) === null || _board$tiles$find === void 0 ? void 0 : _board$tiles$find.id) !== null && _board$tiles$find$id !== void 0 ? _board$tiles$find$id : 9;
@@ -517,6 +521,7 @@ function createGame() {
     turnCount: 0,
     phase: "setup",
     turnStage: "setup",
+    gameMode: gameMode,
     orderLocked: false,
     setupStep: 0,
     setupOrder: setupOrderFor(turnOrder),
@@ -1312,6 +1317,21 @@ function reducer(state, event) {
     }
     return next;
   }
+  if (event.type === "setGameMode") {
+    var _voidTile$id;
+    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    var gameMode = event.gameMode === "hard" ? "hard" : "normal";
+    if (next.gameMode === gameMode) return next;
+    next.gameMode = gameMode;
+    next.board = makeBoard(next.id, gameMode);
+    var voidTile = next.board.tiles.find(function (tile) {
+      return tile.terrain === "desert";
+    });
+    next.criminalTile = (_voidTile$id = voidTile === null || voidTile === void 0 ? void 0 : voidTile.id) !== null && _voidTile$id !== void 0 ? _voidTile$id : 0;
+    next.selectedTile = next.criminalTile;
+    addLog(next, "".concat(gameMode === "hard" ? "ハード" : "ノーマル", "\u30E2\u30FC\u30C9\u306E\u76E4\u9762\u306B\u5207\u308A\u66FF\u3048\u307E\u3057\u305F\u3002"));
+    return next;
+  }
   if (event.type === "randomizeOrder") {
     if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
     var order = randomTurnOrder();
@@ -1930,7 +1950,7 @@ function HelpPanel() {
     }
   }, "\u672A\u77E5\u3078\u306E\u65C5")), tab === "rules" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u30D7\u30EC\u30A4\u30E4\u30FC\u30AB\u30FC\u30C9\u304B\u3089CPU\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3001\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30CE\u30FC\u30DE\u30EB\u306F\u5730\u5F62\u3092\u30E9\u30F3\u30C0\u30E0\u3001\u6570\u5B57\u306F\u6C7A\u3081\u3089\u308C\u305F\u9806\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002\u30CF\u30FC\u30C9\u306F\u30F4\u30A9\u30A4\u30C9\u3092\u542B\u3080\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u30D7\u30EC\u30A4\u30E4\u30FC\u30AB\u30FC\u30C9\u304B\u3089CPU\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
   }, /*#__PURE__*/React.createElement("h2", null, "\u7528\u8A9E\u5BFE\u5FDC"), /*#__PURE__*/React.createElement("dl", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5C0F\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u57FA\u790E\u62E0\u70B9\u3002\u5EFA\u3066\u308B\u3068\u96A3\u63A5\u30BF\u30A4\u30EB\u304B\u3089\u8CC7\u6E90\u3092\u5F97\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5927\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u3092\u5F37\u5316\u3057\u305F\u62E0\u70B9\u3002\u7523\u51FA\u304C2\u500D\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u9818\u754C\u8DEF"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u540C\u58EB\u3092\u3064\u306A\u304E\u3001\u65B0\u3057\u3044\u5C0F\u90FD\u5E02\u3092\u7F6E\u304F\u305F\u3081\u306E\u63A5\u7D9A\u8DEF\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u6B21\u5143\u9580"), /*#__PURE__*/React.createElement("dd", null, "\u63A5\u3057\u3066\u3044\u308B\u3068\u901A\u4FE1\u4EA4\u6613\u304C\u6709\u5229\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30F4\u30A9\u30A4\u30C9"), /*#__PURE__*/React.createElement("dd", null, "\u8CC7\u6E90\u3092\u7523\u51FA\u3057\u306A\u3044\u7279\u6B8A\u30BF\u30A4\u30EB\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA"), /*#__PURE__*/React.createElement("dd", null, "\u3044\u308B\u30BF\u30A4\u30EB\u306E\u7523\u51FA\u3092\u6B62\u3081\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "TVA"), /*#__PURE__*/React.createElement("dd", null, "\u4F7F\u3046\u3068\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u52D5\u304B\u3057\u307E\u3059\u3002"))), /*#__PURE__*/React.createElement("h2", null, "\u8CC7\u6E90"), /*#__PURE__*/React.createElement("p", null, "\u9271\u7269\u6B21\u5143=\u30EC\u30A2\u30E1\u30BF\u30EB\u3001\u6A5F\u68B0\u6B21\u5143=\u30CA\u30CE\u30DE\u30B7\u30F3\u3001\u71B1\u5E2F\u6B21\u5143=\u5EFA\u6750\u3001\u5927\u8349\u539F=\u76AE\u9769\u3001\u80A5\u6C83\u306A\u5927\u5730=\u7A40\u7269\u3002")), tab === "cards" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
@@ -2327,6 +2347,8 @@ function App() {
     className: "pill"
   }, "\u9806\u756A: ", state.orderLocked ? turnOrderText : "未決定"), /*#__PURE__*/React.createElement("span", {
     className: "pill"
+  }, "\u30E2\u30FC\u30C9: ", state.gameMode === "hard" ? "ハード" : "ノーマル"), /*#__PURE__*/React.createElement("span", {
+    className: "pill"
   }, "\u30D5\u30A7\u30FC\u30BA: ", phaseLabel(state)), /*#__PURE__*/React.createElement("span", {
     className: "pill"
   }, "\u64CD\u4F5C: ", BUILD_LABEL[state.action] || (state.action === "criminal" ? "ラヴェジャーズ" : state.action === "discard" ? "資源廃棄" : state.action === "steal" ? "資源奪取" : state.action)), state.dice && /*#__PURE__*/React.createElement("span", {
@@ -2362,7 +2384,30 @@ function App() {
     player: me
   }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modeChooser",
+    "aria-label": "\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9"
   }, /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "normal" ? "selected" : "",
+    onClick: function onClick() {
+      return act({
+        type: "setGameMode",
+        gameMode: "normal"
+      });
+    },
+    disabled: state.phase !== "setup" || state.orderLocked,
+    title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
+  }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "hard" ? "selected" : "",
+    onClick: function onClick() {
+      return act({
+        type: "setGameMode",
+        gameMode: "hard"
+      });
+    },
+    disabled: state.phase !== "setup" || state.orderLocked,
+    title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
+  }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     onClick: function onClick() {
       return act({

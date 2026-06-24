@@ -111,6 +111,27 @@ h2 {
   flex-wrap: wrap;
 }
 
+.modeChooser {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.modeChooser button {
+  min-width: 0;
+}
+
+.modeChooser .selected {
+  border-color: #6ee7f2;
+  color: #07111f;
+  background: #a5f3fc;
+}
+
 .net {
   justify-content: flex-end;
   align-items: center;
