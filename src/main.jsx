@@ -23,6 +23,14 @@ const RESOURCES = {
 };
 
 const RESOURCE_KEYS = Object.keys(RESOURCES);
+const TILE_IMAGES = {
+  rock: "assets/tiles/ore_dimension.png",
+  rare: "assets/tiles/machinery_dimension.png",
+  material: "assets/tiles/tropical_dimension.png",
+  nano: "assets/tiles/great_plains.png",
+  food: "assets/tiles/fertile_ground.png",
+  desert: "assets/tiles/void.png",
+};
 const PLAYERS = [
   { id: 0, name: "Player A", color: "#ff5d73" },
   { id: 1, name: "Player B", color: "#31b6c4" },
@@ -1649,6 +1657,13 @@ function Board({ state, onEvent, myPlayerId }) {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        {state.board.tiles.map((tile) => {
+          const points = tile.corners
+            .map((id) => state.board.vertices.find((v) => v.id === id))
+            .map((p) => `${p.x},${p.y}`)
+            .join(" ");
+          return <clipPath key={`clip-${tile.id}`} id={`tile-clip-${tile.id}`}><polygon points={points} /></clipPath>;
+        })}
       </defs>
       <rect width="720" height="680" fill="url(#space)" />
       {state.board.tiles.map((tile) => {
@@ -1656,10 +1671,20 @@ function Board({ state, onEvent, myPlayerId }) {
           .map((id) => state.board.vertices.find((v) => v.id === id))
           .map((p) => `${p.x},${p.y}`)
           .join(" ");
-        const fill = tile.terrain === "desert" ? "#3b4256" : RESOURCES[tile.terrain].color;
         return (
           <g key={tile.id} onClick={() => onEvent({ type: "selectTile", tileId: tile.id })}>
-            <polygon className="hex" points={points} fill={fill} opacity={state.criminalTile === tile.id ? 0.5 : 0.88} />
+            <image
+              href={TILE_IMAGES[tile.terrain]}
+              x={tile.center.x - HEX_SIZE}
+              y={tile.center.y - HEX_SIZE}
+              width={HEX_SIZE * 2}
+              height={HEX_SIZE * 2}
+              preserveAspectRatio="xMidYMid slice"
+              clipPath={`url(#tile-clip-${tile.id})`}
+              opacity={state.criminalTile === tile.id ? 0.55 : 1}
+            />
+            <polygon className="tileShade" points={points} opacity={state.criminalTile === tile.id ? 0.5 : 0.22} />
+            <polygon className="hex" points={points} fill="none" />
             <text x={tile.center.x} y={tile.center.y - 9} className="tileName">
               {tile.terrain === "desert" ? "ヴォイド" : RESOURCES[tile.terrain].terrain}
             </text>

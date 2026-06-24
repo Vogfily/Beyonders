@@ -100,6 +100,14 @@ var RESOURCES = {
   }
 };
 var RESOURCE_KEYS = Object.keys(RESOURCES);
+var TILE_IMAGES = {
+  rock: "assets/tiles/ore_dimension.png",
+  rare: "assets/tiles/machinery_dimension.png",
+  material: "assets/tiles/tropical_dimension.png",
+  nano: "assets/tiles/great_plains.png",
+  food: "assets/tiles/fertile_ground.png",
+  desert: "assets/tiles/void.png"
+};
 var PLAYERS = [{
   id: 0,
   name: "Player A",
@@ -2122,7 +2130,21 @@ function Board(_ref31) {
     "in": "coloredBlur"
   }), /*#__PURE__*/React.createElement("feMergeNode", {
     "in": "SourceGraphic"
-  })))), /*#__PURE__*/React.createElement("rect", {
+  }))), state.board.tiles.map(function (tile) {
+    var points = tile.corners.map(function (id) {
+      return state.board.vertices.find(function (v) {
+        return v.id === id;
+      });
+    }).map(function (p) {
+      return "".concat(p.x, ",").concat(p.y);
+    }).join(" ");
+    return /*#__PURE__*/React.createElement("clipPath", {
+      key: "clip-".concat(tile.id),
+      id: "tile-clip-".concat(tile.id)
+    }, /*#__PURE__*/React.createElement("polygon", {
+      points: points
+    }));
+  })), /*#__PURE__*/React.createElement("rect", {
     width: "720",
     height: "680",
     fill: "url(#space)"
@@ -2134,7 +2156,6 @@ function Board(_ref31) {
     }).map(function (p) {
       return "".concat(p.x, ",").concat(p.y);
     }).join(" ");
-    var fill = tile.terrain === "desert" ? "#3b4256" : RESOURCES[tile.terrain].color;
     return /*#__PURE__*/React.createElement("g", {
       key: tile.id,
       onClick: function onClick() {
@@ -2143,11 +2164,23 @@ function Board(_ref31) {
           tileId: tile.id
         });
       }
-    }, /*#__PURE__*/React.createElement("polygon", {
+    }, /*#__PURE__*/React.createElement("image", {
+      href: TILE_IMAGES[tile.terrain],
+      x: tile.center.x - HEX_SIZE,
+      y: tile.center.y - HEX_SIZE,
+      width: HEX_SIZE * 2,
+      height: HEX_SIZE * 2,
+      preserveAspectRatio: "xMidYMid slice",
+      clipPath: "url(#tile-clip-".concat(tile.id, ")"),
+      opacity: state.criminalTile === tile.id ? 0.55 : 1
+    }), /*#__PURE__*/React.createElement("polygon", {
+      className: "tileShade",
+      points: points,
+      opacity: state.criminalTile === tile.id ? 0.5 : 0.22
+    }), /*#__PURE__*/React.createElement("polygon", {
       className: "hex",
       points: points,
-      fill: fill,
-      opacity: state.criminalTile === tile.id ? 0.5 : 0.88
+      fill: "none"
     }), /*#__PURE__*/React.createElement("text", {
       x: tile.center.x,
       y: tile.center.y - 9,

@@ -183,6 +183,11 @@ h2 {
   stroke-width: 2;
 }
 
+.tileShade {
+  fill: #020617;
+  pointer-events: none;
+}
+
 .tileName {
   fill: #fff;
   font-size: 10px;
