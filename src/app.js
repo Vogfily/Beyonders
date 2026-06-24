@@ -76,27 +76,32 @@ var RESOURCES = {
   rock: {
     name: "レアメタル",
     terrain: "鉱物次元",
-    color: "#a3544a"
+    color: "#a3544a",
+    icon: "assets/resources/raremetal.png"
   },
   rare: {
     name: "ナノマシン",
     terrain: "機械次元",
-    color: "#64748b"
+    color: "#64748b",
+    icon: "assets/resources/nanomachine.png"
   },
   material: {
     name: "建材",
     terrain: "熱帯次元",
-    color: "#2f855a"
+    color: "#2f855a",
+    icon: "assets/resources/building_materials.png"
   },
   nano: {
     name: "皮革",
     terrain: "大草原",
-    color: "#7c9a3e"
+    color: "#7c9a3e",
+    icon: "assets/resources/leather.png"
   },
   food: {
     name: "穀物",
     terrain: "肥沃な大地",
-    color: "#d5a11e"
+    color: "#d5a11e",
+    icon: "assets/resources/food.png"
   }
 };
 var RESOURCE_KEYS = Object.keys(RESOURCES);
@@ -1684,7 +1689,11 @@ function Cost(_ref22) {
       style: {
         "--dot": RESOURCES[key].color
       }
-    }, RESOURCES[key].name, " ", value);
+    }, /*#__PURE__*/React.createElement("img", {
+      className: "resourceIcon",
+      src: RESOURCES[key].icon,
+      alt: ""
+    }), RESOURCES[key].name, " ", value);
   }));
 }
 function ResourceHand(_ref25) {
@@ -1705,7 +1714,11 @@ function ResourceHand(_ref25) {
       }
     }, /*#__PURE__*/React.createElement("span", {
       className: "resourceName"
-    }, RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
+    }, /*#__PURE__*/React.createElement("img", {
+      className: "resourceIcon",
+      src: RESOURCES[key].icon,
+      alt: ""
+    }), RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
   })));
 }
 function ResourceBundleInput(_ref26) {
@@ -1717,7 +1730,11 @@ function ResourceBundleInput(_ref26) {
   }, /*#__PURE__*/React.createElement("h3", null, title), RESOURCE_KEYS.map(function (key) {
     return /*#__PURE__*/React.createElement("label", {
       key: key
-    }, /*#__PURE__*/React.createElement("span", null, RESOURCES[key].name), /*#__PURE__*/React.createElement("input", {
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("img", {
+      className: "resourceIcon",
+      src: RESOURCES[key].icon,
+      alt: ""
+    }), RESOURCES[key].name), /*#__PURE__*/React.createElement("input", {
       type: "number",
       min: "0",
       max: "19",

@@ -314,9 +314,22 @@ h2 {
 }
 
 .resourceName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #f8fbff;
   font-size: 12px;
   font-weight: 800;
+}
+
+.resourceIcon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 4px;
+  object-fit: cover;
+  vertical-align: middle;
 }
 
 .resourceTile strong {
@@ -379,12 +392,22 @@ h2 {
 }
 
 .cost span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border-radius: 999px;
   padding: 2px 7px;
   color: white;
   background: var(--dot);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.cost .resourceIcon {
+  width: 17px;
+  height: 17px;
+  flex-basis: 17px;
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 .trade {
@@ -443,6 +466,19 @@ h2 {
   gap: 6px;
   color: #cbd6e7;
   font-size: 12px;
+}
+
+.bundleInput label > span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.bundleInput .resourceIcon {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
 }
 
 .bundleInput input {

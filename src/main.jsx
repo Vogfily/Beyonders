@@ -15,11 +15,11 @@ const Swords = () => <Icon label="!" />;
 const Undo2 = () => <Icon label="✓" />;
 
 const RESOURCES = {
-  rock: { name: "レアメタル", terrain: "鉱物次元", color: "#a3544a" },
-  rare: { name: "ナノマシン", terrain: "機械次元", color: "#64748b" },
-  material: { name: "建材", terrain: "熱帯次元", color: "#2f855a" },
-  nano: { name: "皮革", terrain: "大草原", color: "#7c9a3e" },
-  food: { name: "穀物", terrain: "肥沃な大地", color: "#d5a11e" },
+  rock: { name: "レアメタル", terrain: "鉱物次元", color: "#a3544a", icon: "assets/resources/raremetal.png" },
+  rare: { name: "ナノマシン", terrain: "機械次元", color: "#64748b", icon: "assets/resources/nanomachine.png" },
+  material: { name: "建材", terrain: "熱帯次元", color: "#2f855a", icon: "assets/resources/building_materials.png" },
+  nano: { name: "皮革", terrain: "大草原", color: "#7c9a3e", icon: "assets/resources/leather.png" },
+  food: { name: "穀物", terrain: "肥沃な大地", color: "#d5a11e", icon: "assets/resources/food.png" },
 };
 
 const RESOURCE_KEYS = Object.keys(RESOURCES);
@@ -1257,6 +1257,7 @@ function Cost({ cost }) {
     <span className="cost">
       {Object.entries(cost).map(([key, value]) => (
         <span key={key} style={{ "--dot": RESOURCES[key].color }}>
+          <img className="resourceIcon" src={RESOURCES[key].icon} alt="" />
           {RESOURCES[key].name} {value}
         </span>
       ))}
@@ -1275,7 +1276,7 @@ function ResourceHand({ player }) {
       <div className="resourceTiles">
         {RESOURCE_KEYS.map((key) => (
           <div key={key} className="resourceTile" style={{ "--resource": RESOURCES[key].color }}>
-            <span className="resourceName">{RESOURCES[key].name}</span>
+            <span className="resourceName"><img className="resourceIcon" src={RESOURCES[key].icon} alt="" />{RESOURCES[key].name}</span>
             <strong>{player.resources[key] || 0}</strong>
             <small>{RESOURCES[key].terrain}</small>
           </div>
@@ -1291,7 +1292,7 @@ function ResourceBundleInput({ title, value, onChange }) {
       <h3>{title}</h3>
       {RESOURCE_KEYS.map((key) => (
         <label key={key}>
-          <span>{RESOURCES[key].name}</span>
+          <span><img className="resourceIcon" src={RESOURCES[key].icon} alt="" />{RESOURCES[key].name}</span>
           <input
             type="number"
             min="0"
