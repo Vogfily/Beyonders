@@ -31,6 +31,7 @@ const TILE_IMAGES = {
   food: "assets/tiles/fertile_ground.png",
   desert: "assets/tiles/void.png",
 };
+const BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
 const PLAYERS = [
   { id: 0, name: "Player A", color: "#ff5d73" },
   { id: 1, name: "Player B", color: "#31b6c4" },
@@ -1667,6 +1668,15 @@ function Board({ state, onEvent, myPlayerId }) {
         })}
       </defs>
       <rect width="720" height="680" fill="url(#space)" />
+      <image
+        href={BOARD_BACKGROUND_IMAGE}
+        x="0"
+        y="0"
+        width="720"
+        height="680"
+        preserveAspectRatio="xMidYMid slice"
+      />
+      <rect width="720" height="680" fill="rgba(2, 6, 23, 0.18)" />
       {state.board.tiles.map((tile) => {
         const points = tile.corners
           .map((id) => state.board.vertices.find((v) => v.id === id))
@@ -1811,6 +1821,32 @@ function App() {
         </div>
       </section>
 
+      <section className="players">
+        {state.players.map((player) => (
+          <article key={player.id} style={{ "--player": player.color }} className={player.id === active.id ? "active" : ""}>
+            <div>
+              <strong>
+                {player.name}
+                {player.isCpu && <span className="badge cpuBadge">CPU</span>}
+                {player.bonus.longest && <span className="badge">最長領界路</span>}
+                {player.bonus.largestTv && <span className="badge">最大TVA力</span>}
+              </strong>
+              <span>{getVp(state, player.id)} VP</span>
+            </div>
+            <p>{visibleResourceText(player, myPlayerId)}</p>
+            <small>TVA {player.playedTv} / 未知への旅 {player.hiddenNewFrontiers.length}枚 / 公開済み: {publicPlayedFrontiers(player)} / {spaceportText(state, player.id)}</small>
+            <button
+              className="cpuToggle"
+              onClick={() => act({ type: "setCpu", targetId: player.id, isCpu: !player.isCpu })}
+              disabled={player.id === myPlayerId || net.mode === "guest" || state.orderLocked}
+              title={state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
+            >
+              {player.isCpu ? "CPU解除" : "CPUにする"}
+            </button>
+          </article>
+        ))}
+      </section>
+
       <section className="layout">
         <div className="playSurface">
           <div className="statusLine">
@@ -1943,32 +1979,6 @@ function App() {
 
           <HelpPanel />
         </aside>
-      </section>
-
-      <section className="players">
-        {state.players.map((player) => (
-          <article key={player.id} style={{ "--player": player.color }} className={player.id === active.id ? "active" : ""}>
-            <div>
-              <strong>
-                {player.name}
-                {player.isCpu && <span className="badge cpuBadge">CPU</span>}
-                {player.bonus.longest && <span className="badge">最長領界路</span>}
-                {player.bonus.largestTv && <span className="badge">最大TVA力</span>}
-              </strong>
-              <span>{getVp(state, player.id)} VP</span>
-            </div>
-            <p>{visibleResourceText(player, myPlayerId)}</p>
-            <small>TVA {player.playedTv} / 未知への旅 {player.hiddenNewFrontiers.length}枚 / 公開済み: {publicPlayedFrontiers(player)} / {spaceportText(state, player.id)}</small>
-            <button
-              className="cpuToggle"
-              onClick={() => act({ type: "setCpu", targetId: player.id, isCpu: !player.isCpu })}
-              disabled={player.id === myPlayerId || net.mode === "guest" || state.orderLocked}
-              title={state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
-            >
-              {player.isCpu ? "CPU解除" : "CPUにする"}
-            </button>
-          </article>
-        ))}
       </section>
 
       <section className="log">

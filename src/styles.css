@@ -323,11 +323,11 @@ h2 {
 }
 
 .resourceIcon {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 4px;
+  border-radius: 6px;
   object-fit: cover;
   vertical-align: middle;
 }
@@ -404,9 +404,9 @@ h2 {
 }
 
 .cost .resourceIcon {
-  width: 17px;
-  height: 17px;
-  flex-basis: 17px;
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
   border-color: rgba(255, 255, 255, 0.55);
 }
 
@@ -476,9 +476,9 @@ h2 {
 }
 
 .bundleInput .resourceIcon {
-  width: 22px;
-  height: 22px;
-  flex-basis: 22px;
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
 }
 
 .bundleInput input {
@@ -595,14 +595,14 @@ h2 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-top: 16px;
+  margin: 0 0 16px;
 }
 
 .players article {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-left: 5px solid var(--player);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.07);
 }
 
@@ -613,6 +613,7 @@ h2 {
 .players div {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -640,21 +641,22 @@ h2 {
 }
 
 .players p {
-  margin-top: 8px;
+  margin-top: 6px;
   color: #cbd6e7;
   font-size: 12px;
 }
 
 .players small {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: #91a0b7;
+  font-size: 11px;
 }
 
 .cpuToggle {
   width: 100%;
   min-height: 30px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 6px 8px;
   font-size: 12px;
 }

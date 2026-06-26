@@ -113,6 +113,7 @@ var TILE_IMAGES = {
   food: "assets/tiles/fertile_ground.png",
   desert: "assets/tiles/void.png"
 };
+var BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
 var PLAYERS = [{
   id: 0,
   name: "Player A",
@@ -2165,6 +2166,17 @@ function Board(_ref31) {
     width: "720",
     height: "680",
     fill: "url(#space)"
+  }), /*#__PURE__*/React.createElement("image", {
+    href: BOARD_BACKGROUND_IMAGE,
+    x: "0",
+    y: "0",
+    width: "720",
+    height: "680",
+    preserveAspectRatio: "xMidYMid slice"
+  }), /*#__PURE__*/React.createElement("rect", {
+    width: "720",
+    height: "680",
+    fill: "rgba(2, 6, 23, 0.18)"
   }), state.board.tiles.map(function (tile) {
     var points = tile.corners.map(function (id) {
       return state.board.vertices.find(function (v) {
@@ -2386,6 +2398,33 @@ function App() {
   }, /*#__PURE__*/React.createElement(Copy, {
     size: 17
   }), " \u5171\u6709"))), /*#__PURE__*/React.createElement("section", {
+    className: "players"
+  }, state.players.map(function (player) {
+    return /*#__PURE__*/React.createElement("article", {
+      key: player.id,
+      style: {
+        "--player": player.color
+      },
+      className: player.id === active.id ? "active" : ""
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
+      className: "badge cpuBadge"
+    }, "CPU"), player.bonus.longest && /*#__PURE__*/React.createElement("span", {
+      className: "badge"
+    }, "\u6700\u9577\u9818\u754C\u8DEF"), player.bonus.largestTv && /*#__PURE__*/React.createElement("span", {
+      className: "badge"
+    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
+      className: "cpuToggle",
+      onClick: function onClick() {
+        return act({
+          type: "setCpu",
+          targetId: player.id,
+          isCpu: !player.isCpu
+        });
+      },
+      disabled: player.id === myPlayerId || net.mode === "guest" || state.orderLocked,
+      title: state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
+    }, player.isCpu ? "CPU解除" : "CPUにする"));
+  })), /*#__PURE__*/React.createElement("section", {
     className: "layout"
   }, /*#__PURE__*/React.createElement("div", {
     className: "playSurface"
@@ -2646,33 +2685,6 @@ function App() {
   }), !me.hiddenNewFrontiers.length && /*#__PURE__*/React.createElement("span", {
     className: "muted"
   }, "\u306A\u3057"))), /*#__PURE__*/React.createElement(HelpPanel, null))), /*#__PURE__*/React.createElement("section", {
-    className: "players"
-  }, state.players.map(function (player) {
-    return /*#__PURE__*/React.createElement("article", {
-      key: player.id,
-      style: {
-        "--player": player.color
-      },
-      className: player.id === active.id ? "active" : ""
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
-      className: "badge cpuBadge"
-    }, "CPU"), player.bonus.longest && /*#__PURE__*/React.createElement("span", {
-      className: "badge"
-    }, "\u6700\u9577\u9818\u754C\u8DEF"), player.bonus.largestTv && /*#__PURE__*/React.createElement("span", {
-      className: "badge"
-    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
-      className: "cpuToggle",
-      onClick: function onClick() {
-        return act({
-          type: "setCpu",
-          targetId: player.id,
-          isCpu: !player.isCpu
-        });
-      },
-      disabled: player.id === myPlayerId || net.mode === "guest" || state.orderLocked,
-      title: state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
-    }, player.isCpu ? "CPU解除" : "CPUにする"));
-  })), /*#__PURE__*/React.createElement("section", {
     className: "log"
   }, /*#__PURE__*/React.createElement("h2", null, "\u822A\u884C\u30ED\u30B0"), state.winner !== null && /*#__PURE__*/React.createElement("div", {
     className: "winner"
