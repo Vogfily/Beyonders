@@ -1634,11 +1634,12 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     });
   }
 
-  function join(hostId) {
+  function join(hostId, playerId = myPlayerId) {
     if (!window.Peer || !hostId) return;
     const peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", () => {
+      history.replaceState(null, "", `#join=${hostId}&p=${playerId}`);
       const conn = peer.connect(hostId);
       connections.current = [conn];
       conn.on("open", () => setNet({ mode: "guest", status: "参加中", share: location.href }));
@@ -1674,7 +1675,76 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     }
   }, []);
 
-  return { net, host, send };
+  return { net, host, join, send };
+}
+
+function roomIdFromInput(input) {
+  const value = input.trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    const params = new URLSearchParams(url.hash.replace("#", ""));
+    return params.get("join") || params.get("host") || value;
+  } catch {
+    const params = new URLSearchParams(value.replace(/^#/, ""));
+    return params.get("join") || params.get("host") || value;
+  }
+}
+
+function playerIdFromInput(input, fallback = 1) {
+  const value = input.trim();
+  if (!value) return fallback;
+  try {
+    const url = new URL(value);
+    const id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  } catch {
+    const id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  }
+}
+
+function HomeScreen({ net, onCreate, onJoin }) {
+  const [joinInput, setJoinInput] = useState("");
+  const canJoin = Boolean(roomIdFromInput(joinInput));
+  return (
+    <main className="homeMain">
+      <section className="homeHero">
+        <div>
+          <h1>Beyonders</h1>
+          <p>次元を開拓し、領界路を伸ばし、Discordで交渉しながら10 VPを目指すオンライン卓。</p>
+        </div>
+      </section>
+
+      <section className="homeActions">
+        <article>
+          <h2>Create a Room</h2>
+          <p>ホストとして新しい部屋を作ります。作成後に共有リンクとDiscord募集文をコピーできます。</p>
+          <button className="primary homeButton" onClick={onCreate} disabled={!window.Peer}>
+            <RadioTower size={18} /> 部屋を作成
+          </button>
+        </article>
+
+        <article>
+          <h2>Join a Room</h2>
+          <p>友人から受け取った共有リンク、または部屋IDを貼り付けて参加します。</p>
+          <input
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
+            placeholder="共有リンクまたは部屋ID"
+          />
+          <button className="homeButton" onClick={() => onJoin(joinInput)} disabled={!canJoin || !window.Peer}>
+            <Orbit size={18} /> 部屋に参加
+          </button>
+        </article>
+      </section>
+
+      <section className="homeNote">
+        <span>{net.status}</span>
+        <p>既存の共有リンクを開いた場合は、自動で参加画面へ進みます。</p>
+      </section>
+    </main>
+  );
 }
 
 function Board({ state, onEvent, myPlayerId }) {
@@ -1798,13 +1868,16 @@ function Board({ state, onEvent, myPlayerId }) {
 }
 
 function App() {
-  const initialRoom = useMemo(() => new URLSearchParams(location.hash.replace("#", "")).get("room") || crypto.randomUUID().slice(0, 8), []);
+  const initialParams = useMemo(() => new URLSearchParams(location.hash.replace("#", "")), []);
+  const initialRoom = useMemo(() => initialParams.get("room") || crypto.randomUUID().slice(0, 8), [initialParams]);
+  const startsInRoom = useMemo(() => Boolean(initialParams.get("join") || initialParams.get("host")), [initialParams]);
   const [state, setState] = useState(() => createGame(initialRoom));
-  const [myPlayerId, setMyPlayerId] = useState(() => Number(new URLSearchParams(location.hash.replace("#", "")).get("p") || 0));
+  const [myPlayerId, setMyPlayerId] = useState(() => Number(initialParams.get("p") || 0));
+  const [screen, setScreen] = useState(() => startsInRoom ? "game" : "home");
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
   const [copyStatus, setCopyStatus] = useState("");
-  const { net, host, send } = usePeerRoom(state, setState, state.id, myPlayerId);
+  const { net, host, join, send } = usePeerRoom(state, setState, state.id, myPlayerId);
 
   function act(event) {
     const owned = { ...event, playerId: myPlayerId };
@@ -1849,6 +1922,25 @@ function App() {
       setCopyStatus("コピーできませんでした");
       window.setTimeout(() => setCopyStatus(""), 2200);
     });
+  }
+
+  function createRoomFromHome() {
+    host();
+    setMyPlayerId(0);
+    setScreen("game");
+  }
+
+  function joinRoomFromHome(input) {
+    const roomId = roomIdFromInput(input);
+    if (!roomId) return;
+    const playerId = playerIdFromInput(input, 1);
+    setMyPlayerId(playerId);
+    join(roomId, playerId);
+    setScreen("game");
+  }
+
+  if (screen === "home") {
+    return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} />;
   }
 
   return (

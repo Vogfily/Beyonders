@@ -2074,10 +2074,12 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     });
   }
   function join(hostId) {
+    var playerId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : myPlayerId;
     if (!window.Peer || !hostId) return;
     var peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", function () {
+      history.replaceState(null, "", "#join=".concat(hostId, "&p=").concat(playerId));
       var conn = peer.connect(hostId);
       connections.current = [conn];
       conn.on("open", function () {
@@ -2131,13 +2133,78 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
   return {
     net: net,
     host: host,
+    join: join,
     send: send
   };
 }
-function Board(_ref31) {
-  var state = _ref31.state,
-    onEvent = _ref31.onEvent,
-    myPlayerId = _ref31.myPlayerId;
+function roomIdFromInput(input) {
+  var value = input.trim();
+  if (!value) return "";
+  try {
+    var url = new URL(value);
+    var params = new URLSearchParams(url.hash.replace("#", ""));
+    return params.get("join") || params.get("host") || value;
+  } catch (_unused) {
+    var _params = new URLSearchParams(value.replace(/^#/, ""));
+    return _params.get("join") || _params.get("host") || value;
+  }
+}
+function playerIdFromInput(input) {
+  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+  var value = input.trim();
+  if (!value) return fallback;
+  try {
+    var url = new URL(value);
+    var id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  } catch (_unused2) {
+    var _id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
+    return Number.isInteger(_id) && _id >= 0 && _id <= 3 ? _id : fallback;
+  }
+}
+function HomeScreen(_ref31) {
+  var net = _ref31.net,
+    onCreate = _ref31.onCreate,
+    onJoin = _ref31.onJoin;
+  var _useState13 = useState(""),
+    _useState14 = _slicedToArray(_useState13, 2),
+    joinInput = _useState14[0],
+    setJoinInput = _useState14[1];
+  var canJoin = Boolean(roomIdFromInput(joinInput));
+  return /*#__PURE__*/React.createElement("main", {
+    className: "homeMain"
+  }, /*#__PURE__*/React.createElement("section", {
+    className: "homeHero"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u6B21\u5143\u3092\u958B\u62D3\u3057\u3001\u9818\u754C\u8DEF\u3092\u4F38\u3070\u3057\u3001Discord\u3067\u4EA4\u6E09\u3057\u306A\u304C\u308910 VP\u3092\u76EE\u6307\u3059\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002"))), /*#__PURE__*/React.createElement("section", {
+    className: "homeActions"
+  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306B\u5171\u6709\u30EA\u30F3\u30AF\u3068Discord\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
+    className: "primary homeButton",
+    onClick: onCreate,
+    disabled: !window.Peer
+  }, /*#__PURE__*/React.createElement(RadioTower, {
+    size: 18
+  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u5171\u6709\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306F\u90E8\u5C4BID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
+    value: joinInput,
+    onChange: function onChange(e) {
+      return setJoinInput(e.target.value);
+    },
+    placeholder: "\u5171\u6709\u30EA\u30F3\u30AF\u307E\u305F\u306F\u90E8\u5C4BID"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "homeButton",
+    onClick: function onClick() {
+      return onJoin(joinInput);
+    },
+    disabled: !canJoin || !window.Peer
+  }, /*#__PURE__*/React.createElement(Orbit, {
+    size: 18
+  }), " \u90E8\u5C4B\u306B\u53C2\u52A0"))), /*#__PURE__*/React.createElement("section", {
+    className: "homeNote"
+  }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
+}
+function Board(_ref32) {
+  var state = _ref32.state,
+    onEvent = _ref32.onEvent,
+    myPlayerId = _ref32.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2327,43 +2394,56 @@ function Board(_ref31) {
   }));
 }
 function App() {
-  var initialRoom = useMemo(function () {
-    return new URLSearchParams(location.hash.replace("#", "")).get("room") || crypto.randomUUID().slice(0, 8);
+  var initialParams = useMemo(function () {
+    return new URLSearchParams(location.hash.replace("#", ""));
   }, []);
-  var _useState13 = useState(function () {
+  var initialRoom = useMemo(function () {
+    return initialParams.get("room") || crypto.randomUUID().slice(0, 8);
+  }, [initialParams]);
+  var startsInRoom = useMemo(function () {
+    return Boolean(initialParams.get("join") || initialParams.get("host"));
+  }, [initialParams]);
+  var _useState15 = useState(function () {
       return createGame(initialRoom);
     }),
-    _useState14 = _slicedToArray(_useState13, 2),
-    state = _useState14[0],
-    setState = _useState14[1];
-  var _useState15 = useState(function () {
-      return Number(new URLSearchParams(location.hash.replace("#", "")).get("p") || 0);
-    }),
     _useState16 = _slicedToArray(_useState15, 2),
-    myPlayerId = _useState16[0],
-    setMyPlayerId = _useState16[1];
-  var _useState17 = useState({
+    state = _useState16[0],
+    setState = _useState16[1];
+  var _useState17 = useState(function () {
+      return Number(initialParams.get("p") || 0);
+    }),
+    _useState18 = _slicedToArray(_useState17, 2),
+    myPlayerId = _useState18[0],
+    setMyPlayerId = _useState18[1];
+  var _useState19 = useState(function () {
+      return startsInRoom ? "game" : "home";
+    }),
+    _useState20 = _slicedToArray(_useState19, 2),
+    screen = _useState20[0],
+    setScreen = _useState20[1];
+  var _useState21 = useState({
       give: "rock",
       take: "food"
     }),
-    _useState18 = _slicedToArray(_useState17, 2),
-    trade = _useState18[0],
-    setTrade = _useState18[1];
-  var _useState19 = useState({
+    _useState22 = _slicedToArray(_useState21, 2),
+    trade = _useState22[0],
+    setTrade = _useState22[1];
+  var _useState23 = useState({
       resource: "rock",
       a: "rock",
       b: "material"
     }),
-    _useState20 = _slicedToArray(_useState19, 2),
-    devChoice = _useState20[0],
-    setDevChoice = _useState20[1];
-  var _useState21 = useState(""),
-    _useState22 = _slicedToArray(_useState21, 2),
-    copyStatus = _useState22[0],
-    setCopyStatus = _useState22[1];
+    _useState24 = _slicedToArray(_useState23, 2),
+    devChoice = _useState24[0],
+    setDevChoice = _useState24[1];
+  var _useState25 = useState(""),
+    _useState26 = _slicedToArray(_useState25, 2),
+    copyStatus = _useState26[0],
+    setCopyStatus = _useState26[1];
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
+    join = _usePeerRoom.join,
     send = _usePeerRoom.send;
   function act(event) {
     var owned = _objectSpread(_objectSpread({}, event), {}, {
@@ -2418,6 +2498,26 @@ function App() {
       window.setTimeout(function () {
         return setCopyStatus("");
       }, 2200);
+    });
+  }
+  function createRoomFromHome() {
+    host();
+    setMyPlayerId(0);
+    setScreen("game");
+  }
+  function joinRoomFromHome(input) {
+    var roomId = roomIdFromInput(input);
+    if (!roomId) return;
+    var playerId = playerIdFromInput(input, 1);
+    setMyPlayerId(playerId);
+    join(roomId, playerId);
+    setScreen("game");
+  }
+  if (screen === "home") {
+    return /*#__PURE__*/React.createElement(HomeScreen, {
+      net: net,
+      onCreate: createRoomFromHome,
+      onJoin: joinRoomFromHome
     });
   }
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
