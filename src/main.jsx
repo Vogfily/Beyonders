@@ -168,6 +168,10 @@ function randomTurnOrder() {
   return shuffle(DEFAULT_TURN_ORDER, Math.random);
 }
 
+function generateRoomId() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 function hexToPixel(q, r) {
   return {
     x: CENTER.x + HEX_SIZE * Math.sqrt(3) * (q + r / 2),
@@ -370,7 +374,7 @@ function makeBoard(seedText, gameMode = "normal") {
   };
 }
 
-function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
+function createGame(roomId = generateRoomId()) {
   const gameMode = "normal";
   const board = makeBoard(roomId, gameMode);
   const neutron = board.tiles.find((tile) => tile.terrain === "desert")?.id ?? 9;
@@ -380,6 +384,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     board,
     players: PLAYERS.map((player) => ({
       ...player,
+      joined: player.id === 0,
       kickedAt: null,
       isCpu: false,
       resources: emptyResources(),
@@ -513,11 +518,11 @@ function discordRulesText() {
 }
 
 function isUnclaimedPlayerSeat(player, actorId) {
-  return player.id !== actorId && !player.isCpu && player.name === PLAYERS[player.id]?.name;
+  return player.id !== actorId && !player.isCpu && !player.joined;
 }
 
 function isReadyHuman(player) {
-  return !player.isCpu && player.name.trim() && player.name !== PLAYERS[player.id]?.name;
+  return !player.isCpu && Boolean(player.joined);
 }
 
 function readyHumanCount(state) {
@@ -951,7 +956,7 @@ function reducer(state, event) {
   const player = next.players[actor];
   if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
 
-  if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
+  if (event.type === "reset") return createGame(event.roomId || generateRoomId());
   if (event.type === "dissolveRoom") {
     if (!isParentPlayer(actor)) return next;
     next.roomClosedAt = Date.now();
@@ -965,13 +970,25 @@ function reducer(state, event) {
     const target = next.players[targetId];
     if (!target) return next;
     target.name = PLAYERS[targetId]?.name || `Player ${targetId + 1}`;
+    target.joined = false;
     target.isCpu = false;
     target.kickedAt = Date.now();
     addLog(next, `${PLAYERS[targetId]?.name || `Player ${targetId + 1}`} のプレイヤーを退出させました。`);
     return next;
   }
+  if (event.type === "joinPlayer") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
+    const joinerId = Number(event.targetId ?? actor);
+    const joiner = next.players[joinerId];
+    if (!joiner || joiner.isCpu) return next;
+    joiner.joined = true;
+    joiner.kickedAt = null;
+    addLog(next, `${joiner.name} が参加しました。`);
+    return next;
+  }
   if (event.type === "rename") {
     next.players[actor].name = sanitizePlayerName(event.name) || `Player ${actor + 1}`;
+    next.players[actor].joined = true;
     next.players[actor].kickedAt = null;
     return next;
   }
@@ -982,9 +999,11 @@ function reducer(state, event) {
     if (!target) return next;
     target.isCpu = Boolean(event.isCpu);
     if (target.isCpu) {
+      target.joined = false;
       target.name = target.name.startsWith("CPU") ? target.name : `CPU ${String.fromCharCode(65 + targetId)}`;
       addLog(next, `${target.name} がCPUとして参加します。`);
     } else {
+      target.joined = target.id === actor;
       target.name = target.name.startsWith("CPU") ? `Player ${targetId + 1}` : target.name;
       addLog(next, `${target.name} がプレイヤー枠に戻りました。`);
     }
@@ -996,6 +1015,7 @@ function reducer(state, event) {
     next.players.forEach((target) => {
       if (!isUnclaimedPlayerSeat(target, actor)) return;
       target.isCpu = true;
+      target.joined = false;
       target.name = `CPU ${String.fromCharCode(65 + target.id)}`;
       filled.push(target.name);
     });
@@ -1643,14 +1663,23 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     return () => script.remove();
   }, []);
 
-  function host() {
+  function peerIdForRoom(code) {
+    return /^\d{6}$/.test(code) ? `beyonders-${code}` : code;
+  }
+
+  function displayRoomCode(id) {
+    return id.replace(/^beyonders-/, "");
+  }
+
+  function host(roomCode = generateRoomId()) {
     if (!window.Peer) return;
-    const peer = new window.Peer(`star-${roomId}-${Date.now().toString(36)}`);
+    const peer = new window.Peer(peerIdForRoom(roomCode));
     peerRef.current = peer;
     peer.on("open", (id) => {
-      const url = `${location.origin}${location.pathname}#join=${id}`;
-      setNet({ mode: "host", status: "ホスト中", share: url, roomId: id });
-      history.replaceState(null, "", `#host=${id}&p=0`);
+      const roomCode = displayRoomCode(id);
+      const url = `${location.origin}${location.pathname}#join=${roomCode}`;
+      setNet({ mode: "host", status: "ホスト中", share: url, roomId: roomCode });
+      history.replaceState(null, "", `#host=${roomCode}&p=0`);
     });
     peer.on("connection", (conn) => {
       conn.on("open", () => {
@@ -1662,7 +1691,12 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
           return;
         }
         connections.current.push({ conn, playerId });
-        conn.send({ type: "assign", playerId, state: stateRef.current, roomId: peer.id });
+        setState((prev) => {
+          const next = reducer(prev, { type: "joinPlayer", playerId: 0, targetId: playerId });
+          conn.send({ type: "assign", playerId, state: next, roomId: displayRoomCode(peer.id) });
+          connections.current.forEach(({ conn: c }) => c !== conn && c.open && c.send({ type: "state", state: next }));
+          return next;
+        });
       });
       conn.on("data", (message) => {
         if (message.type === "event") {
@@ -1681,17 +1715,19 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
 
   function join(hostId) {
     if (!window.Peer || !hostId) return;
+    const roomCode = displayRoomCode(hostId);
+    const peerHostId = peerIdForRoom(roomCode);
     const peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", () => {
-      history.replaceState(null, "", `#join=${hostId}`);
-      const conn = peer.connect(hostId);
+      history.replaceState(null, "", `#join=${roomCode}`);
+      const conn = peer.connect(peerHostId);
       connections.current = [conn];
-      conn.on("open", () => setNet({ mode: "guest", status: "参加処理中", share: location.href, roomId: hostId }));
+      conn.on("open", () => setNet({ mode: "guest", status: "参加処理中", share: location.href, roomId: roomCode }));
       conn.on("data", (message) => {
         if (message.type === "assign") {
           setMyPlayerId(message.playerId);
-          setNet({ mode: "guest", status: "参加中", share: location.href, roomId: message.roomId || hostId });
+          setNet({ mode: "guest", status: "参加中", share: location.href, roomId: message.roomId || roomCode });
           setState(message.state);
           return;
         }
@@ -1745,19 +1781,23 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
 function roomIdFromInput(input) {
   const value = input.trim();
   if (!value) return "";
+  const normalize = (roomId) => {
+    const cleaned = String(roomId || "").trim().replace(/^beyonders-/, "");
+    return /^\d{6}$/.test(cleaned) ? cleaned : "";
+  };
   try {
     const url = new URL(value);
     const params = new URLSearchParams(url.hash.replace("#", ""));
-    return params.get("join") || params.get("host") || value;
+    return normalize(params.get("join") || params.get("host") || value);
   } catch {
     const params = new URLSearchParams(value.replace(/^#/, ""));
-    return params.get("join") || params.get("host") || value;
+    return normalize(params.get("join") || params.get("host") || value);
   }
 }
 
 function HomeScreen({ net, onCreate, onJoin, alert }) {
   const [joinInput, setJoinInput] = useState("");
-  const canJoin = Boolean(roomIdFromInput(joinInput));
+  const canJoin = joinInput.trim() === "POPUP!" || Boolean(roomIdFromInput(joinInput));
   return (
     <main className="homeMain">
       {alert && <div className="homeAlert">{alert}</div>}
@@ -1771,7 +1811,7 @@ function HomeScreen({ net, onCreate, onJoin, alert }) {
       <section className="homeActions">
         <article>
           <h2>Create a Room</h2>
-          <p>ホストとして新しい部屋を作ります。作成後にRoom IDと募集リンクを共有できます。</p>
+          <p>ホストとして新しい部屋を作ります。作成後に6桁のRoom IDと募集リンクを共有できます。</p>
           <button className="primary homeButton" onClick={onCreate} disabled={!window.Peer}>
             <RadioTower size={18} /> 部屋を作成
           </button>
@@ -1779,7 +1819,7 @@ function HomeScreen({ net, onCreate, onJoin, alert }) {
 
         <article>
           <h2>Join a Room</h2>
-          <p>友人から受け取った募集リンク、またはRoom IDを貼り付けて参加します。</p>
+          <p>友人から受け取った募集リンク、または6桁のRoom IDを貼り付けて参加します。</p>
           <input
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
@@ -2041,7 +2081,7 @@ function Board({ state, onEvent, myPlayerId }) {
 
 function App() {
   const initialParams = useMemo(() => new URLSearchParams(location.hash.replace("#", "")), []);
-  const initialRoom = useMemo(() => initialParams.get("room") || crypto.randomUUID().slice(0, 8), [initialParams]);
+  const initialRoom = useMemo(() => initialParams.get("room") || initialParams.get("host") || initialParams.get("join") || generateRoomId(), [initialParams]);
   const startsInRoom = useMemo(() => Boolean(initialParams.get("join") || initialParams.get("host")), [initialParams]);
   const [state, setState] = useState(() => createGame(initialRoom));
   const [myPlayerId, setMyPlayerId] = useState(() => Number(initialParams.get("p") || 0));
@@ -2067,7 +2107,7 @@ function App() {
     if (!state.roomClosedAt) return;
     closeNetwork();
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
   }, [state.roomClosedAt]);
 
@@ -2077,7 +2117,7 @@ function App() {
     lastKickedAt.current = kickedAt;
     closeNetwork();
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
   }, [state.players, myPlayerId]);
 
@@ -2121,7 +2161,9 @@ function App() {
   }
 
   function createRoomFromHome() {
-    host();
+    const roomId = generateRoomId();
+    setState(createGame(roomId));
+    host(roomId);
     setMyPlayerId(0);
     setScreen("lobby");
   }
@@ -2139,7 +2181,7 @@ function App() {
 
   function showRoomFullAlert() {
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
     setHomeAlert("参加可能人数をオーバーしたため、参加できませんでした");
     window.setTimeout(() => setHomeAlert(""), 5000);

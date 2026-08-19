@@ -271,6 +271,9 @@ function setupOrderFor(turnOrder) {
 function randomTurnOrder() {
   return shuffle(DEFAULT_TURN_ORDER, Math.random);
 }
+function generateRoomId() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 function hexToPixel(q, r) {
   return {
     x: CENTER.x + HEX_SIZE * Math.sqrt(3) * (q + r / 2),
@@ -502,7 +505,7 @@ function makeBoard(seedText) {
 }
 function createGame() {
   var _board$tiles$find$id, _board$tiles$find;
-  var roomId = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : crypto.randomUUID().slice(0, 8);
+  var roomId = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : generateRoomId();
   var gameMode = "normal";
   var board = makeBoard(roomId, gameMode);
   var neutron = (_board$tiles$find$id = (_board$tiles$find = board.tiles.find(function (tile) {
@@ -514,6 +517,7 @@ function createGame() {
     board: board,
     players: PLAYERS.map(function (player) {
       return _objectSpread(_objectSpread({}, player), {}, {
+        joined: player.id === 0,
         kickedAt: null,
         isCpu: false,
         resources: emptyResources(),
@@ -651,12 +655,10 @@ function discordRulesText() {
   return ["Beyonders かんたん案内", "目的: 10VPを先に取ったプレイヤーの勝利。", "流れ: サイコロ → 資源獲得 → メインフェーズ。", "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。", "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。", "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。", "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"].join("\n");
 }
 function isUnclaimedPlayerSeat(player, actorId) {
-  var _PLAYERS$player$id;
-  return player.id !== actorId && !player.isCpu && player.name === ((_PLAYERS$player$id = PLAYERS[player.id]) === null || _PLAYERS$player$id === void 0 ? void 0 : _PLAYERS$player$id.name);
+  return player.id !== actorId && !player.isCpu && !player.joined;
 }
 function isReadyHuman(player) {
-  var _PLAYERS$player$id2;
-  return !player.isCpu && player.name.trim() && player.name !== ((_PLAYERS$player$id2 = PLAYERS[player.id]) === null || _PLAYERS$player$id2 === void 0 ? void 0 : _PLAYERS$player$id2.name);
+  return !player.isCpu && Boolean(player.joined);
 }
 function readyHumanCount(state) {
   return state.players.filter(isReadyHuman).length;
@@ -1336,7 +1338,7 @@ function reducer(state, event) {
   var actor = (_event$playerId = event.playerId) !== null && _event$playerId !== void 0 ? _event$playerId : currentPlayer(next).id;
   var player = next.players[actor];
   if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
-  if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
+  if (event.type === "reset") return createGame(event.roomId || generateRoomId());
   if (event.type === "dissolveRoom") {
     if (!isParentPlayer(actor)) return next;
     next.roomClosedAt = Date.now();
@@ -1351,13 +1353,26 @@ function reducer(state, event) {
     var target = next.players[targetId];
     if (!target) return next;
     target.name = ((_PLAYERS$targetId = PLAYERS[targetId]) === null || _PLAYERS$targetId === void 0 ? void 0 : _PLAYERS$targetId.name) || "Player ".concat(targetId + 1);
+    target.joined = false;
     target.isCpu = false;
     target.kickedAt = Date.now();
     addLog(next, "".concat(((_PLAYERS$targetId2 = PLAYERS[targetId]) === null || _PLAYERS$targetId2 === void 0 ? void 0 : _PLAYERS$targetId2.name) || "Player ".concat(targetId + 1), " \u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u3092\u9000\u51FA\u3055\u305B\u307E\u3057\u305F\u3002"));
     return next;
   }
+  if (event.type === "joinPlayer") {
+    var _event$targetId;
+    if (next.phase !== "setup" || next.orderLocked) return next;
+    var joinerId = Number((_event$targetId = event.targetId) !== null && _event$targetId !== void 0 ? _event$targetId : actor);
+    var joiner = next.players[joinerId];
+    if (!joiner || joiner.isCpu) return next;
+    joiner.joined = true;
+    joiner.kickedAt = null;
+    addLog(next, "".concat(joiner.name, " \u304C\u53C2\u52A0\u3057\u307E\u3057\u305F\u3002"));
+    return next;
+  }
   if (event.type === "rename") {
     next.players[actor].name = sanitizePlayerName(event.name) || "Player ".concat(actor + 1);
+    next.players[actor].joined = true;
     next.players[actor].kickedAt = null;
     return next;
   }
@@ -1368,9 +1383,11 @@ function reducer(state, event) {
     if (!_target) return next;
     _target.isCpu = Boolean(event.isCpu);
     if (_target.isCpu) {
+      _target.joined = false;
       _target.name = _target.name.startsWith("CPU") ? _target.name : "CPU ".concat(String.fromCharCode(65 + _targetId));
       addLog(next, "".concat(_target.name, " \u304CCPU\u3068\u3057\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"));
     } else {
+      _target.joined = _target.id === actor;
       _target.name = _target.name.startsWith("CPU") ? "Player ".concat(_targetId + 1) : _target.name;
       addLog(next, "".concat(_target.name, " \u304C\u30D7\u30EC\u30A4\u30E4\u30FC\u67A0\u306B\u623B\u308A\u307E\u3057\u305F\u3002"));
     }
@@ -1382,6 +1399,7 @@ function reducer(state, event) {
     next.players.forEach(function (target) {
       if (!isUnclaimedPlayerSeat(target, actor)) return;
       target.isCpu = true;
+      target.joined = false;
       target.name = "CPU ".concat(String.fromCharCode(65 + target.id));
       filled.push(target.name);
     });
@@ -2075,19 +2093,27 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
       return script.remove();
     };
   }, []);
+  function peerIdForRoom(code) {
+    return /^\d{6}$/.test(code) ? "beyonders-".concat(code) : code;
+  }
+  function displayRoomCode(id) {
+    return id.replace(/^beyonders-/, "");
+  }
   function host() {
+    var roomCode = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : generateRoomId();
     if (!window.Peer) return;
-    var peer = new window.Peer("star-".concat(roomId, "-").concat(Date.now().toString(36)));
+    var peer = new window.Peer(peerIdForRoom(roomCode));
     peerRef.current = peer;
     peer.on("open", function (id) {
-      var url = "".concat(location.origin).concat(location.pathname, "#join=").concat(id);
+      var roomCode = displayRoomCode(id);
+      var url = "".concat(location.origin).concat(location.pathname, "#join=").concat(roomCode);
       setNet({
         mode: "host",
         status: "ホスト中",
         share: url,
-        roomId: id
+        roomId: roomCode
       });
-      history.replaceState(null, "", "#host=".concat(id, "&p=0"));
+      history.replaceState(null, "", "#host=".concat(roomCode, "&p=0"));
     });
     peer.on("connection", function (conn) {
       conn.on("open", function () {
@@ -2109,19 +2135,34 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
           conn: conn,
           playerId: playerId
         });
-        conn.send({
-          type: "assign",
-          playerId: playerId,
-          state: stateRef.current,
-          roomId: peer.id
+        setState(function (prev) {
+          var next = reducer(prev, {
+            type: "joinPlayer",
+            playerId: 0,
+            targetId: playerId
+          });
+          conn.send({
+            type: "assign",
+            playerId: playerId,
+            state: next,
+            roomId: displayRoomCode(peer.id)
+          });
+          connections.current.forEach(function (_ref31) {
+            var c = _ref31.conn;
+            return c !== conn && c.open && c.send({
+              type: "state",
+              state: next
+            });
+          });
+          return next;
         });
       });
       conn.on("data", function (message) {
         if (message.type === "event") {
           setState(function (prev) {
             var next = reducer(prev, message.event);
-            connections.current.forEach(function (_ref31) {
-              var c = _ref31.conn;
+            connections.current.forEach(function (_ref32) {
+              var c = _ref32.conn;
               return c.open && c.send({
                 type: "state",
                 state: next
@@ -2140,18 +2181,20 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
   }
   function join(hostId) {
     if (!window.Peer || !hostId) return;
+    var roomCode = displayRoomCode(hostId);
+    var peerHostId = peerIdForRoom(roomCode);
     var peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", function () {
-      history.replaceState(null, "", "#join=".concat(hostId));
-      var conn = peer.connect(hostId);
+      history.replaceState(null, "", "#join=".concat(roomCode));
+      var conn = peer.connect(peerHostId);
       connections.current = [conn];
       conn.on("open", function () {
         return setNet({
           mode: "guest",
           status: "参加処理中",
           share: location.href,
-          roomId: hostId
+          roomId: roomCode
         });
       });
       conn.on("data", function (message) {
@@ -2161,7 +2204,7 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
             mode: "guest",
             status: "参加中",
             share: location.href,
-            roomId: message.roomId || hostId
+            roomId: message.roomId || roomCode
           });
           setState(message.state);
           return;
@@ -2191,8 +2234,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
   function closeNetwork() {
     var _peerRef$current, _peerRef$current$dest;
     connections.current.forEach(function (item) {
-      var _close, _ref32;
-      return (_close = (_ref32 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref32);
+      var _close, _ref33;
+      return (_close = (_ref33 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref33);
     });
     connections.current = [];
     (_peerRef$current = peerRef.current) === null || _peerRef$current === void 0 || (_peerRef$current$dest = _peerRef$current.destroy) === null || _peerRef$current$dest === void 0 || _peerRef$current$dest.call(_peerRef$current);
@@ -2205,8 +2248,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     });
   }
   useEffect(function () {
-    if (net.mode === "host") connections.current.forEach(function (_ref33) {
-      var c = _ref33.conn;
+    if (net.mode === "host") connections.current.forEach(function (_ref34) {
+      var c = _ref34.conn;
       return c.open && c.send({
         type: "state",
         state: state
@@ -2239,25 +2282,29 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
 function roomIdFromInput(input) {
   var value = input.trim();
   if (!value) return "";
+  var normalize = function normalize(roomId) {
+    var cleaned = String(roomId || "").trim().replace(/^beyonders-/, "");
+    return /^\d{6}$/.test(cleaned) ? cleaned : "";
+  };
   try {
     var url = new URL(value);
     var params = new URLSearchParams(url.hash.replace("#", ""));
-    return params.get("join") || params.get("host") || value;
+    return normalize(params.get("join") || params.get("host") || value);
   } catch (_unused) {
     var _params = new URLSearchParams(value.replace(/^#/, ""));
-    return _params.get("join") || _params.get("host") || value;
+    return normalize(_params.get("join") || _params.get("host") || value);
   }
 }
-function HomeScreen(_ref34) {
-  var net = _ref34.net,
-    onCreate = _ref34.onCreate,
-    onJoin = _ref34.onJoin,
-    alert = _ref34.alert;
+function HomeScreen(_ref35) {
+  var net = _ref35.net,
+    onCreate = _ref35.onCreate,
+    onJoin = _ref35.onJoin,
+    alert = _ref35.alert;
   var _useState13 = useState(""),
     _useState14 = _slicedToArray(_useState13, 2),
     joinInput = _useState14[0],
     setJoinInput = _useState14[1];
-  var canJoin = Boolean(roomIdFromInput(joinInput));
+  var canJoin = joinInput.trim() === "POPUP!" || Boolean(roomIdFromInput(joinInput));
   return /*#__PURE__*/React.createElement("main", {
     className: "homeMain"
   }, alert && /*#__PURE__*/React.createElement("div", {
@@ -2266,13 +2313,13 @@ function HomeScreen(_ref34) {
     className: "homeHero"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u9818\u754C\u8DEF\u3092\u5EFA\u8A2D\u3057\u3066\u6B21\u5143\u3092\u958B\u62D3\u3057\u3066\u304D\u3001\u52DD\u5229\u3092\u76EE\u6307\u305D\u3046"))), /*#__PURE__*/React.createElement("section", {
     className: "homeActions"
-  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306BRoom ID\u3068\u52DF\u96C6\u30EA\u30F3\u30AF\u3092\u5171\u6709\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306B6\u6841\u306ERoom ID\u3068\u52DF\u96C6\u30EA\u30F3\u30AF\u3092\u5171\u6709\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
     className: "primary homeButton",
     onClick: onCreate,
     disabled: !window.Peer
   }, /*#__PURE__*/React.createElement(RadioTower, {
     size: 18
-  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u52DF\u96C6\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306FRoom ID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
+  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u52DF\u96C6\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306F6\u6841\u306ERoom ID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
     value: joinInput,
     onChange: function onChange(e) {
       return setJoinInput(e.target.value);
@@ -2290,17 +2337,17 @@ function HomeScreen(_ref34) {
     className: "homeNote"
   }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
 }
-function LobbyScreen(_ref35) {
-  var state = _ref35.state,
-    myPlayerId = _ref35.myPlayerId,
-    net = _ref35.net,
-    onEvent = _ref35.onEvent,
-    onCopyInvite = _ref35.onCopyInvite,
-    onCopyRules = _ref35.onCopyRules,
-    copyStatus = _ref35.copyStatus,
-    onStartHuman = _ref35.onStartHuman,
-    onStartCpu = _ref35.onStartCpu,
-    onDissolveRoom = _ref35.onDissolveRoom;
+function LobbyScreen(_ref36) {
+  var state = _ref36.state,
+    myPlayerId = _ref36.myPlayerId,
+    net = _ref36.net,
+    onEvent = _ref36.onEvent,
+    onCopyInvite = _ref36.onCopyInvite,
+    onCopyRules = _ref36.onCopyRules,
+    copyStatus = _ref36.copyStatus,
+    onStartHuman = _ref36.onStartHuman,
+    onStartCpu = _ref36.onStartCpu,
+    onDissolveRoom = _ref36.onDissolveRoom;
   var readyCount = readyHumanCount(state);
   var ownReady = isReadyHuman(state.players[myPlayerId]);
   var isParent = isParentPlayer(myPlayerId);
@@ -2418,10 +2465,10 @@ function LobbyScreen(_ref35) {
     }, "kick"));
   })));
 }
-function Board(_ref36) {
-  var state = _ref36.state,
-    onEvent = _ref36.onEvent,
-    myPlayerId = _ref36.myPlayerId;
+function Board(_ref37) {
+  var state = _ref37.state,
+    onEvent = _ref37.onEvent,
+    myPlayerId = _ref37.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2615,7 +2662,7 @@ function App() {
     return new URLSearchParams(location.hash.replace("#", ""));
   }, []);
   var initialRoom = useMemo(function () {
-    return initialParams.get("room") || crypto.randomUUID().slice(0, 8);
+    return initialParams.get("room") || initialParams.get("host") || initialParams.get("join") || generateRoomId();
   }, [initialParams]);
   var startsInRoom = useMemo(function () {
     return Boolean(initialParams.get("join") || initialParams.get("host"));
@@ -2684,7 +2731,7 @@ function App() {
     if (!state.roomClosedAt) return;
     closeNetwork();
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
   }, [state.roomClosedAt]);
   useEffect(function () {
@@ -2694,7 +2741,7 @@ function App() {
     lastKickedAt.current = kickedAt;
     closeNetwork();
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
   }, [state.players, myPlayerId]);
   useEffect(function () {
@@ -2744,7 +2791,9 @@ function App() {
     });
   }
   function createRoomFromHome() {
-    host();
+    var roomId = generateRoomId();
+    setState(createGame(roomId));
+    host(roomId);
     setMyPlayerId(0);
     setScreen("lobby");
   }
@@ -2760,7 +2809,7 @@ function App() {
   }
   function showRoomFullAlert() {
     setScreen("home");
-    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
     setHomeAlert("参加可能人数をオーバーしたため、参加できませんでした");
     window.setTimeout(function () {
