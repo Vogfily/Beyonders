@@ -526,6 +526,10 @@ function discordRulesText() {
   ].join("\n");
 }
 
+function isUnclaimedPlayerSeat(player, actorId) {
+  return player.id !== actorId && !player.isCpu && !player.discord && player.name === PLAYERS[player.id]?.name;
+}
+
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -967,6 +971,18 @@ function reducer(state, event) {
       target.name = target.name.startsWith("CPU") ? `Player ${targetId + 1}` : target.name;
       addLog(next, `${target.name} がプレイヤー枠に戻りました。`);
     }
+    return next;
+  }
+  if (event.type === "fillCpu") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
+    const filled = [];
+    next.players.forEach((target) => {
+      if (!isUnclaimedPlayerSeat(target, actor)) return;
+      target.isCpu = true;
+      target.name = `CPU ${String.fromCharCode(65 + target.id)}`;
+      filled.push(target.name);
+    });
+    addLog(next, filled.length ? `空き枠をCPUで補完しました: ${filled.join(" / ")}` : "CPUで補完できる空き枠はありません。");
     return next;
   }
   if (event.type === "setGameMode") {
@@ -1554,7 +1570,7 @@ function HelpPanel() {
             <li>出目と同じ数字のタイルに隣接する小都市は資源1、大都市は資源2を得ます。</li>
             <li>7が出たらラヴェジャーズを移動し、そのタイルは産出しません。</li>
             <li>次元門に接する小都市か大都市があると、2:1または3:1交易が使えます。</li>
-            <li>人数が足りない時はプレイヤーカードからCPUに切り替えられます。CPUは交渉に参加しません。</li>
+            <li>人数が足りない時は「空き枠をCPU補完」で未設定の席をまとめてCPUにできます。CPUは交渉に参加しません。</li>
           </ul>
           <h2>勝利点</h2>
           <p>小都市は1 VP、大都市は2 VP、勝利記録は1 VPです。最長領界路と最大TVA力はそれぞれ2 VPです。</p>
@@ -2067,6 +2083,13 @@ function App() {
                 ハード
               </button>
             </div>
+            <button
+              onClick={() => act({ type: "fillCpu" })}
+              disabled={state.phase !== "setup" || state.orderLocked || net.mode === "guest"}
+              title="名前やDiscord名が未設定の席をCPUにします"
+            >
+              <Orbit size={18} /> 空き枠をCPU補完
+            </button>
             <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>
               <Shuffle size={18} /> 順番決定して開始
             </button>
