@@ -164,8 +164,8 @@ h2 {
 .homeMain::before,
 .homeMain::after {
   content: "";
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  inset: -10%;
   pointer-events: none;
 }
 
@@ -174,8 +174,9 @@ h2 {
   background-image: url("../assets/board/home_universe.png");
   background-position: center;
   background-size: cover;
-  transform: scale(1.08);
-  animation: homeSpaceDrift 34s ease-in-out infinite alternate;
+  transform: scale(1.16) translate3d(-3%, -2%, 0);
+  animation: homeSpaceDrift 16s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 .homeMain::after {
@@ -186,11 +187,14 @@ h2 {
 }
 
 @keyframes homeSpaceDrift {
-  from {
-    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  0% {
+    transform: scale(1.16) translate3d(-3%, -2%, 0);
   }
-  to {
-    transform: scale(1.16) translate3d(1.5%, 1%, 0);
+  45% {
+    transform: scale(1.24) translate3d(2%, -1%, 0);
+  }
+  100% {
+    transform: scale(1.2) translate3d(3%, 2%, 0);
   }
 }
 
