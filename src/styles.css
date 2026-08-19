@@ -85,7 +85,9 @@ p {
 }
 
 h1 {
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
   font-size: clamp(30px, 5vw, 58px);
+  font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
 }
