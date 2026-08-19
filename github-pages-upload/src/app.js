@@ -642,6 +642,19 @@ function phaseLabel(state) {
   if (state.turnStage === "production") return "資源獲得";
   return "メインフェーズ";
 }
+function discordInviteText(state, shareUrl) {
+  var mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
+  var players = state.players.map(function (player) {
+    return "".concat(player.name).concat(player.isCpu ? " CPU" : "");
+  }).join(" / ");
+  var order = state.orderLocked ? (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
+    return state.players[id].name;
+  }).join(" → ") : "これから決定";
+  return ["Beyondersの卓を立てました。", "\u53C2\u52A0\u30EA\u30F3\u30AF: ".concat(shareUrl), "\u30E2\u30FC\u30C9: ".concat(mode), "\u53C2\u52A0\u67A0: ".concat(players), "\u9806\u756A: ".concat(order), "Discordのボイスチャンネルで交渉しながら遊びましょう。"].join("\n");
+}
+function discordRulesText() {
+  return ["Beyonders かんたん案内", "目的: 10VPを先に取ったプレイヤーの勝利。", "流れ: サイコロ → 資源獲得 → メインフェーズ。", "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。", "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。", "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。", "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"].join("\n");
+}
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -2338,6 +2351,10 @@ function App() {
     _useState20 = _slicedToArray(_useState19, 2),
     devChoice = _useState20[0],
     setDevChoice = _useState20[1];
+  var _useState21 = useState(""),
+    _useState22 = _slicedToArray(_useState21, 2),
+    copyStatus = _useState22[0],
+    setCopyStatus = _useState22[1];
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
@@ -2379,6 +2396,24 @@ function App() {
   var turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
     return state.players[id].name;
   }).join(" → ");
+  var shareUrl = net.share || location.href;
+  function copyToClipboard(text, label) {
+    if (!navigator.clipboard) {
+      setCopyStatus("コピー機能が使えません");
+      return;
+    }
+    navigator.clipboard.writeText(text).then(function () {
+      setCopyStatus("".concat(label, "\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F"));
+      window.setTimeout(function () {
+        return setCopyStatus("");
+      }, 2200);
+    })["catch"](function () {
+      setCopyStatus("コピーできませんでした");
+      window.setTimeout(function () {
+        return setCopyStatus("");
+      }, 2200);
+    });
+  }
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u3092\u5E83\u3052\u3001\u5927\u90FD\u5E02\u3078\u80B2\u3066\u300110\u70B9\u3092\u76EE\u6307\u30594\u4EBA\u7528\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002")), /*#__PURE__*/React.createElement("div", {
@@ -2390,14 +2425,30 @@ function App() {
     size: 17
   }), " \u90E8\u5C4B\u4F5C\u6210"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      var _navigator$clipboard;
-      return net.share && ((_navigator$clipboard = navigator.clipboard) === null || _navigator$clipboard === void 0 ? void 0 : _navigator$clipboard.writeText(net.share));
+      return copyToClipboard(net.share, "共有リンク");
     },
     disabled: !net.share,
     title: "\u5171\u6709\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC"
   }, /*#__PURE__*/React.createElement(Copy, {
     size: 17
-  }), " \u5171\u6709"))), /*#__PURE__*/React.createElement("section", {
+  }), " \u5171\u6709"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文");
+    },
+    disabled: !net.share,
+    title: "Discord\u306B\u8CBC\u308B\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return copyToClipboard(discordRulesText(), "ルール案内");
+    },
+    title: "Discord\u306B\u56FA\u5B9A\u3059\u308B\u30EB\u30FC\u30EB\u6848\u5185\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u30EB\u30FC\u30EB\u6587"), copyStatus && /*#__PURE__*/React.createElement("span", {
+    className: "copyStatus"
+  }, copyStatus))), /*#__PURE__*/React.createElement("section", {
     className: "players"
   }, state.players.map(function (player) {
     return /*#__PURE__*/React.createElement("article", {

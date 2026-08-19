@@ -142,6 +142,15 @@ h2 {
   font-size: 13px;
 }
 
+.copyStatus {
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid rgba(165, 243, 252, 0.35);
+  border-radius: 8px;
+  color: #d9fbff;
+  background: rgba(14, 116, 144, 0.25);
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;

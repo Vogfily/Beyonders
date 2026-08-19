@@ -494,6 +494,34 @@ function phaseLabel(state) {
   return "メインフェーズ";
 }
 
+function discordInviteText(state, shareUrl) {
+  const mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
+  const players = state.players.map((player) => `${player.name}${player.isCpu ? " CPU" : ""}`).join(" / ");
+  const order = state.orderLocked
+    ? (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ")
+    : "これから決定";
+  return [
+    "Beyondersの卓を立てました。",
+    `参加リンク: ${shareUrl}`,
+    `モード: ${mode}`,
+    `参加枠: ${players}`,
+    `順番: ${order}`,
+    "Discordのボイスチャンネルで交渉しながら遊びましょう。"
+  ].join("\n");
+}
+
+function discordRulesText() {
+  return [
+    "Beyonders かんたん案内",
+    "目的: 10VPを先に取ったプレイヤーの勝利。",
+    "流れ: サイコロ → 資源獲得 → メインフェーズ。",
+    "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。",
+    "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。",
+    "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。",
+    "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"
+  ].join("\n");
+}
+
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -1767,6 +1795,7 @@ function App() {
   const [myPlayerId, setMyPlayerId] = useState(() => Number(new URLSearchParams(location.hash.replace("#", "")).get("p") || 0));
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
+  const [copyStatus, setCopyStatus] = useState("");
   const { net, host, send } = usePeerRoom(state, setState, state.id, myPlayerId);
 
   function act(event) {
@@ -1798,6 +1827,21 @@ function App() {
   const currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
   const selectablePlayers = state.players.filter((player) => !player.isCpu || player.id === myPlayerId);
   const turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ");
+  const shareUrl = net.share || location.href;
+
+  function copyToClipboard(text, label) {
+    if (!navigator.clipboard) {
+      setCopyStatus("コピー機能が使えません");
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyStatus(`${label}をコピーしました`);
+      window.setTimeout(() => setCopyStatus(""), 2200);
+    }).catch(() => {
+      setCopyStatus("コピーできませんでした");
+      window.setTimeout(() => setCopyStatus(""), 2200);
+    });
+  }
 
   return (
     <main>
@@ -1812,12 +1856,26 @@ function App() {
             <RadioTower size={17} /> 部屋作成
           </button>
           <button
-            onClick={() => net.share && navigator.clipboard?.writeText(net.share)}
+            onClick={() => copyToClipboard(net.share, "共有リンク")}
             disabled={!net.share}
             title="共有リンクをコピー"
           >
             <Copy size={17} /> 共有
           </button>
+          <button
+            onClick={() => copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文")}
+            disabled={!net.share}
+            title="Discordに貼る募集文をコピー"
+          >
+            <Copy size={17} /> 募集文
+          </button>
+          <button
+            onClick={() => copyToClipboard(discordRulesText(), "ルール案内")}
+            title="Discordに固定するルール案内をコピー"
+          >
+            <Copy size={17} /> ルール文
+          </button>
+          {copyStatus && <span className="copyStatus">{copyStatus}</span>}
         </div>
       </section>
 
