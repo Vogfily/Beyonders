@@ -209,6 +209,32 @@ h2 {
   text-align: center;
 }
 
+.bgmControl {
+  position: fixed;
+  right: 18px;
+  bottom: 78px;
+  z-index: 6;
+}
+
+.bgmButton {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-color: rgba(165, 243, 252, 0.34);
+  color: #dff7ff;
+  background: rgba(7, 17, 31, 0.78);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bgmButton.active {
+  border-color: rgba(110, 231, 242, 0.68);
+  color: #07111f;
+  background: rgba(165, 243, 252, 0.88);
+}
+
 .homeMain {
   display: grid;
   min-height: 100vh;

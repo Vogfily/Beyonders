@@ -72,6 +72,16 @@ var Undo2 = function Undo2() {
     label: "\u2713"
   });
 };
+var Music = function Music() {
+  return /*#__PURE__*/React.createElement(Icon, {
+    label: "\u266A"
+  });
+};
+var Muted = function Muted() {
+  return /*#__PURE__*/React.createElement(Icon, {
+    label: "\xD7"
+  });
+};
 var RESOURCES = {
   rock: {
     name: "レアメタル",
@@ -114,6 +124,8 @@ var TILE_IMAGES = {
   desert: "assets/tiles/void.png"
 };
 var BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
+var BGM_TRACK = "assets/audio/space_world.mp3";
+var BGM_STORAGE_KEY = "beyonders-bgm-enabled";
 var PLAYERS = [{
   id: 0,
   name: "Player A",
@@ -2777,6 +2789,81 @@ function Board(_ref36) {
     }));
   }));
 }
+function readBgmPreference() {
+  try {
+    return localStorage.getItem(BGM_STORAGE_KEY) !== "off";
+  } catch (_unused3) {
+    return true;
+  }
+}
+function writeBgmPreference(enabled) {
+  try {
+    localStorage.setItem(BGM_STORAGE_KEY, enabled ? "on" : "off");
+  } catch (_unused4) {
+    // Local storage is optional; the audio control still works without it.
+  }
+}
+function BgmControl() {
+  var audioRef = useRef(null);
+  var _useState15 = useState(readBgmPreference),
+    _useState16 = _slicedToArray(_useState15, 2),
+    enabled = _useState16[0],
+    setEnabled = _useState16[1];
+  function playAudio() {
+    var _audio$play;
+    var force = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+    var audio = audioRef.current;
+    if (!audio || !enabled && !force) return;
+    audio.volume = 0.36;
+    (_audio$play = audio.play) === null || _audio$play === void 0 || _audio$play.call(audio)["catch"](function () {});
+  }
+  useEffect(function () {
+    var audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.36;
+    if (enabled) playAudio(true);else audio.pause();
+    writeBgmPreference(enabled);
+  }, [enabled]);
+  useEffect(function () {
+    var resume = function resume() {
+      return playAudio();
+    };
+    window.addEventListener("pointerdown", resume, {
+      passive: true
+    });
+    window.addEventListener("keydown", resume);
+    return function () {
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("keydown", resume);
+    };
+  }, [enabled]);
+  function toggleBgm() {
+    var audio = audioRef.current;
+    if (enabled) {
+      audio === null || audio === void 0 || audio.pause();
+      setEnabled(false);
+      return;
+    }
+    setEnabled(true);
+    window.setTimeout(function () {
+      return playAudio(true);
+    }, 0);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bgmControl"
+  }, /*#__PURE__*/React.createElement("audio", {
+    ref: audioRef,
+    src: BGM_TRACK,
+    loop: true,
+    preload: "auto"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "bgmButton ".concat(enabled ? "active" : ""),
+    onClick: toggleBgm,
+    title: enabled ? "BGMを停止" : "BGMを再生",
+    "aria-label": enabled ? "BGMを停止" : "BGMを再生"
+  }, enabled ? /*#__PURE__*/React.createElement(Music, null) : /*#__PURE__*/React.createElement(Muted, null), " BGM ", enabled ? "ON" : "OFF"));
+}
 function App() {
   var initialParams = useMemo(function () {
     return new URLSearchParams(location.hash.replace("#", ""));
@@ -2787,47 +2874,47 @@ function App() {
   var startsInRoom = useMemo(function () {
     return Boolean(initialParams.get("join") || initialParams.get("host"));
   }, [initialParams]);
-  var _useState15 = useState(function () {
+  var _useState17 = useState(function () {
       return createGame(initialRoom);
     }),
-    _useState16 = _slicedToArray(_useState15, 2),
-    state = _useState16[0],
-    setState = _useState16[1];
-  var _useState17 = useState(function () {
+    _useState18 = _slicedToArray(_useState17, 2),
+    state = _useState18[0],
+    setState = _useState18[1];
+  var _useState19 = useState(function () {
       return Number(initialParams.get("p") || 0);
     }),
-    _useState18 = _slicedToArray(_useState17, 2),
-    myPlayerId = _useState18[0],
-    setMyPlayerId = _useState18[1];
-  var _useState19 = useState(function () {
+    _useState20 = _slicedToArray(_useState19, 2),
+    myPlayerId = _useState20[0],
+    setMyPlayerId = _useState20[1];
+  var _useState21 = useState(function () {
       return startsInRoom ? "lobby" : "home";
     }),
-    _useState20 = _slicedToArray(_useState19, 2),
-    screen = _useState20[0],
-    setScreen = _useState20[1];
-  var _useState21 = useState({
+    _useState22 = _slicedToArray(_useState21, 2),
+    screen = _useState22[0],
+    setScreen = _useState22[1];
+  var _useState23 = useState({
       give: "rock",
       take: "food"
     }),
-    _useState22 = _slicedToArray(_useState21, 2),
-    trade = _useState22[0],
-    setTrade = _useState22[1];
-  var _useState23 = useState({
+    _useState24 = _slicedToArray(_useState23, 2),
+    trade = _useState24[0],
+    setTrade = _useState24[1];
+  var _useState25 = useState({
       resource: "rock",
       a: "rock",
       b: "material"
     }),
-    _useState24 = _slicedToArray(_useState23, 2),
-    devChoice = _useState24[0],
-    setDevChoice = _useState24[1];
-  var _useState25 = useState(""),
     _useState26 = _slicedToArray(_useState25, 2),
-    copyStatus = _useState26[0],
-    setCopyStatus = _useState26[1];
+    devChoice = _useState26[0],
+    setDevChoice = _useState26[1];
   var _useState27 = useState(""),
     _useState28 = _slicedToArray(_useState27, 2),
-    homeAlert = _useState28[0],
-    setHomeAlert = _useState28[1];
+    copyStatus = _useState28[0],
+    setCopyStatus = _useState28[1];
+  var _useState29 = useState(""),
+    _useState30 = _slicedToArray(_useState29, 2),
+    homeAlert = _useState30[0],
+    setHomeAlert = _useState30[1];
   var lastKickedAt = useRef(null);
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert, showHostDisconnectedAlert),
     net = _usePeerRoom.net,
@@ -2994,15 +3081,15 @@ function App() {
     });
   }
   if (screen === "home") {
-    return /*#__PURE__*/React.createElement(HomeScreen, {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement(HomeScreen, {
       net: net,
       onCreate: createRoomFromHome,
       onJoin: joinRoomFromHome,
       alert: homeAlert
-    });
+    }));
   }
   if (screen === "lobby" && !state.orderLocked) {
-    return /*#__PURE__*/React.createElement(LobbyScreen, {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement(LobbyScreen, {
       state: state,
       myPlayerId: myPlayerId,
       net: net,
@@ -3017,9 +3104,9 @@ function App() {
       onStartHuman: startHumanGame,
       onStartCpu: startCpuGame,
       onDissolveRoom: dissolveRoom
-    });
+    }));
   }
-  return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u3092\u5E83\u3052\u3001\u5927\u90FD\u5E02\u3078\u80B2\u3066\u300110\u70B9\u3092\u76EE\u6307\u30594\u4EBA\u7528\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002")), /*#__PURE__*/React.createElement("div", {
     className: "net"
@@ -3308,6 +3395,6 @@ function App() {
     className: "dangerButton",
     onClick: dissolveRoom,
     disabled: !isParentPlayer(myPlayerId) || net.mode === "guest"
-  }, "Exit the Game")));
+  }, "Exit the Game"))));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

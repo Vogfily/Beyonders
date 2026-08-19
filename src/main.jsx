@@ -13,6 +13,8 @@ const Satellite = () => <Icon label="◉" />;
 const Shuffle = () => <Icon label="⇄" />;
 const Swords = () => <Icon label="!" />;
 const Undo2 = () => <Icon label="✓" />;
+const Music = () => <Icon label="♪" />;
+const Muted = () => <Icon label="×" />;
 
 const RESOURCES = {
   rock: { name: "レアメタル", terrain: "鉱物次元", color: "#a3544a", icon: "assets/resources/raremetal.png" },
@@ -32,6 +34,8 @@ const TILE_IMAGES = {
   desert: "assets/tiles/void.png",
 };
 const BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
+const BGM_TRACK = "assets/audio/space_world.mp3";
+const BGM_STORAGE_KEY = "beyonders-bgm-enabled";
 const PLAYERS = [
   { id: 0, name: "Player A", color: "#ff5d73" },
   { id: 1, name: "Player B", color: "#31b6c4" },
@@ -2182,6 +2186,79 @@ function Board({ state, onEvent, myPlayerId }) {
   );
 }
 
+function readBgmPreference() {
+  try {
+    return localStorage.getItem(BGM_STORAGE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function writeBgmPreference(enabled) {
+  try {
+    localStorage.setItem(BGM_STORAGE_KEY, enabled ? "on" : "off");
+  } catch {
+    // Local storage is optional; the audio control still works without it.
+  }
+}
+
+function BgmControl() {
+  const audioRef = useRef(null);
+  const [enabled, setEnabled] = useState(readBgmPreference);
+
+  function playAudio(force = false) {
+    const audio = audioRef.current;
+    if (!audio || (!enabled && !force)) return;
+    audio.volume = 0.36;
+    audio.play?.().catch(() => {});
+  }
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.36;
+    if (enabled) playAudio(true);
+    else audio.pause();
+    writeBgmPreference(enabled);
+  }, [enabled]);
+
+  useEffect(() => {
+    const resume = () => playAudio();
+    window.addEventListener("pointerdown", resume, { passive: true });
+    window.addEventListener("keydown", resume);
+    return () => {
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("keydown", resume);
+    };
+  }, [enabled]);
+
+  function toggleBgm() {
+    const audio = audioRef.current;
+    if (enabled) {
+      audio?.pause();
+      setEnabled(false);
+      return;
+    }
+    setEnabled(true);
+    window.setTimeout(() => playAudio(true), 0);
+  }
+
+  return (
+    <div className="bgmControl">
+      <audio ref={audioRef} src={BGM_TRACK} loop preload="auto" />
+      <button
+        type="button"
+        className={`bgmButton ${enabled ? "active" : ""}`}
+        onClick={toggleBgm}
+        title={enabled ? "BGMを停止" : "BGMを再生"}
+        aria-label={enabled ? "BGMを停止" : "BGMを再生"}
+      >
+        {enabled ? <Music /> : <Muted />} BGM {enabled ? "ON" : "OFF"}
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const initialParams = useMemo(() => new URLSearchParams(location.hash.replace("#", "")), []);
   const initialRoom = useMemo(() => initialParams.get("room") || initialParams.get("host") || initialParams.get("join") || generateRoomId(), [initialParams]);
@@ -2343,27 +2420,37 @@ function App() {
   }
 
   if (screen === "home") {
-    return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} alert={homeAlert} />;
+    return (
+      <>
+        <BgmControl />
+        <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} alert={homeAlert} />
+      </>
+    );
   }
 
   if (screen === "lobby" && !state.orderLocked) {
     return (
-      <LobbyScreen
-        state={state}
-        myPlayerId={myPlayerId}
-        net={net}
-        onEvent={act}
-        onCopyInvite={() => copyToClipboard(inviteLinkText(shareUrl), "募集リンク")}
-        onCopyRules={() => copyToClipboard(discordRulesText(), "ルール案内")}
-        copyStatus={copyStatus}
-        onStartHuman={startHumanGame}
-        onStartCpu={startCpuGame}
-        onDissolveRoom={dissolveRoom}
-      />
+      <>
+        <BgmControl />
+        <LobbyScreen
+          state={state}
+          myPlayerId={myPlayerId}
+          net={net}
+          onEvent={act}
+          onCopyInvite={() => copyToClipboard(inviteLinkText(shareUrl), "募集リンク")}
+          onCopyRules={() => copyToClipboard(discordRulesText(), "ルール案内")}
+          copyStatus={copyStatus}
+          onStartHuman={startHumanGame}
+          onStartCpu={startCpuGame}
+          onDissolveRoom={dissolveRoom}
+        />
+      </>
     );
   }
 
   return (
+    <>
+    <BgmControl />
     <main>
       <section className="topbar">
         <div>
@@ -2542,6 +2629,7 @@ function App() {
         </button>
       </section>
     </main>
+    </>
   );
 }
 
