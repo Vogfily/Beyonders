@@ -152,10 +152,46 @@ h2 {
 }
 
 .homeMain {
+  position: relative;
+  isolation: isolate;
   display: grid;
   min-height: 100vh;
   align-content: center;
   gap: 24px;
+  overflow: hidden;
+}
+
+.homeMain::before,
+.homeMain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.homeMain::before {
+  z-index: -2;
+  background-image: url("../assets/board/home_universe.png");
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.08);
+  animation: homeSpaceDrift 34s ease-in-out infinite alternate;
+}
+
+.homeMain::after {
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(49, 182, 196, 0.2), transparent 34%),
+    linear-gradient(135deg, rgba(7, 17, 31, 0.66), rgba(12, 18, 32, 0.88));
+}
+
+@keyframes homeSpaceDrift {
+  from {
+    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  }
+  to {
+    transform: scale(1.16) translate3d(1.5%, 1%, 0);
+  }
 }
 
 .homeHero {
