@@ -496,20 +496,8 @@ function phaseLabel(state) {
   return "メインフェーズ";
 }
 
-function discordInviteText(state, shareUrl) {
-  const mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
-  const players = state.players.map((player) => `${player.name}${player.isCpu ? " CPU" : ""}`).join(" / ");
-  const order = state.orderLocked
-    ? (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ")
-    : "これから決定";
-  return [
-    "Beyondersの卓を立てました。",
-    `参加リンク: ${shareUrl}`,
-    `モード: ${mode}`,
-    `参加枠: ${players}`,
-    `順番: ${order}`,
-    "Discordのボイスチャンネルで交渉しながら遊びましょう。"
-  ].join("\n");
+function inviteLinkText(shareUrl) {
+  return shareUrl;
 }
 
 function discordRulesText() {
@@ -979,7 +967,7 @@ function reducer(state, event) {
     target.name = PLAYERS[targetId]?.name || `Player ${targetId + 1}`;
     target.isCpu = false;
     target.kickedAt = Date.now();
-    addLog(next, `席 ${targetId + 1} のプレイヤーを退出させました。`);
+    addLog(next, `${PLAYERS[targetId]?.name || `Player ${targetId + 1}`} のプレイヤーを退出させました。`);
     return next;
   }
   if (event.type === "rename") {
@@ -1599,7 +1587,7 @@ function HelpPanel() {
             <li>出目と同じ数字のタイルに隣接する小都市は資源1、大都市は資源2を得ます。</li>
             <li>7が出たらラヴェジャーズを移動し、そのタイルは産出しません。</li>
             <li>次元門に接する小都市か大都市があると、2:1または3:1交易が使えます。</li>
-            <li>人数が足りない時は「空き枠をCPU補完」で未設定の席をまとめてCPUにできます。CPUは交渉に参加しません。</li>
+            <li>人数が足りない時は未設定の枠をまとめてCPUにできます。CPUは交渉に参加しません。</li>
           </ul>
           <h2>勝利点</h2>
           <p>小都市は1 VP、大都市は2 VP、勝利記録は1 VPです。最長領界路と最大TVA力はそれぞれ2 VPです。</p>
@@ -1639,8 +1627,8 @@ function HelpPanel() {
   );
 }
 
-function usePeerRoom(state, setState, roomId, myPlayerId) {
-  const [net, setNet] = useState({ mode: "local", status: "ローカル", share: "" });
+function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomFull) {
+  const [net, setNet] = useState({ mode: "local", status: "ローカル", share: "", roomId: "" });
   const peerRef = useRef(null);
   const connections = useRef([]);
   const stateRef = useRef(state);
@@ -1660,35 +1648,58 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     const peer = new window.Peer(`star-${roomId}-${Date.now().toString(36)}`);
     peerRef.current = peer;
     peer.on("open", (id) => {
-      const url = `${location.origin}${location.pathname}#join=${id}&p=1`;
-      setNet({ mode: "host", status: "ホスト中", share: url });
+      const url = `${location.origin}${location.pathname}#join=${id}`;
+      setNet({ mode: "host", status: "ホスト中", share: url, roomId: id });
       history.replaceState(null, "", `#host=${id}&p=0`);
     });
     peer.on("connection", (conn) => {
-      connections.current.push(conn);
-      conn.on("open", () => conn.send({ type: "state", state: stateRef.current }));
+      conn.on("open", () => {
+        const usedIds = new Set([0, ...connections.current.map((item) => item.playerId)]);
+        const playerId = [1, 2, 3].find((id) => !usedIds.has(id));
+        if (playerId === undefined) {
+          conn.send({ type: "roomFull" });
+          conn.close?.();
+          return;
+        }
+        connections.current.push({ conn, playerId });
+        conn.send({ type: "assign", playerId, state: stateRef.current, roomId: peer.id });
+      });
       conn.on("data", (message) => {
         if (message.type === "event") {
           setState((prev) => {
             const next = reducer(prev, message.event);
-            connections.current.forEach((c) => c.open && c.send({ type: "state", state: next }));
+            connections.current.forEach(({ conn: c }) => c.open && c.send({ type: "state", state: next }));
             return next;
           });
         }
       });
+      conn.on("close", () => {
+        connections.current = connections.current.filter((item) => item.conn !== conn);
+      });
     });
   }
 
-  function join(hostId, playerId = myPlayerId) {
+  function join(hostId) {
     if (!window.Peer || !hostId) return;
     const peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", () => {
-      history.replaceState(null, "", `#join=${hostId}&p=${playerId}`);
+      history.replaceState(null, "", `#join=${hostId}`);
       const conn = peer.connect(hostId);
       connections.current = [conn];
-      conn.on("open", () => setNet({ mode: "guest", status: "参加中", share: location.href }));
+      conn.on("open", () => setNet({ mode: "guest", status: "参加処理中", share: location.href, roomId: hostId }));
       conn.on("data", (message) => {
+        if (message.type === "assign") {
+          setMyPlayerId(message.playerId);
+          setNet({ mode: "guest", status: "参加中", share: location.href, roomId: message.roomId || hostId });
+          setState(message.state);
+          return;
+        }
+        if (message.type === "roomFull") {
+          closeNetwork();
+          onRoomFull?.();
+          return;
+        }
         if (message.type === "state") setState(message.state);
       });
     });
@@ -1703,15 +1714,15 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
   }
 
   function closeNetwork() {
-    connections.current.forEach((conn) => conn.close?.());
+    connections.current.forEach((item) => (item.conn || item).close?.());
     connections.current = [];
     peerRef.current?.destroy?.();
     peerRef.current = null;
-    setNet({ mode: "local", status: window.Peer ? "オンライン接続を準備できます" : "ローカル", share: "" });
+    setNet({ mode: "local", status: window.Peer ? "オンライン接続を準備できます" : "ローカル", share: "", roomId: "" });
   }
 
   useEffect(() => {
-    if (net.mode === "host") connections.current.forEach((c) => c.open && c.send({ type: "state", state }));
+    if (net.mode === "host") connections.current.forEach(({ conn: c }) => c.open && c.send({ type: "state", state }));
   }, [state, net.mode]);
 
   useEffect(() => {
@@ -1744,24 +1755,12 @@ function roomIdFromInput(input) {
   }
 }
 
-function playerIdFromInput(input, fallback = 1) {
-  const value = input.trim();
-  if (!value) return fallback;
-  try {
-    const url = new URL(value);
-    const id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
-    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
-  } catch {
-    const id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
-    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
-  }
-}
-
-function HomeScreen({ net, onCreate, onJoin }) {
+function HomeScreen({ net, onCreate, onJoin, alert }) {
   const [joinInput, setJoinInput] = useState("");
   const canJoin = Boolean(roomIdFromInput(joinInput));
   return (
     <main className="homeMain">
+      {alert && <div className="homeAlert">{alert}</div>}
       <section className="homeHero">
         <div>
           <h1>Beyonders</h1>
@@ -1772,7 +1771,7 @@ function HomeScreen({ net, onCreate, onJoin }) {
       <section className="homeActions">
         <article>
           <h2>Create a Room</h2>
-          <p>ホストとして新しい部屋を作ります。作成後に共有リンクとDiscord募集文をコピーできます。</p>
+          <p>ホストとして新しい部屋を作ります。作成後にRoom IDと募集リンクを共有できます。</p>
           <button className="primary homeButton" onClick={onCreate} disabled={!window.Peer}>
             <RadioTower size={18} /> 部屋を作成
           </button>
@@ -1780,11 +1779,11 @@ function HomeScreen({ net, onCreate, onJoin }) {
 
         <article>
           <h2>Join a Room</h2>
-          <p>友人から受け取った共有リンク、または部屋IDを貼り付けて参加します。</p>
+          <p>友人から受け取った募集リンク、またはRoom IDを貼り付けて参加します。</p>
           <input
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
-            placeholder="共有リンクまたは部屋ID"
+            placeholder="募集リンクまたはRoom ID"
           />
           <button className="homeButton" onClick={() => onJoin(joinInput)} disabled={!canJoin || !window.Peer}>
             <Orbit size={18} /> 部屋に参加
@@ -1803,7 +1802,6 @@ function HomeScreen({ net, onCreate, onJoin }) {
 function LobbyScreen({
   state,
   myPlayerId,
-  setMyPlayerId,
   net,
   onEvent,
   onCopyInvite,
@@ -1824,12 +1822,13 @@ function LobbyScreen({
       <section className="topbar">
         <div>
           <h1>Beyonders</h1>
-          <p>待機中。席を選び、プレイヤー名を入力してから開始します。</p>
+          <p>待機中。プレイヤー名を入力してから開始します。</p>
         </div>
         <div className="net">
           <span>{net.status}</span>
-          <button onClick={onCopyInvite} disabled={!net.share} title="共有リンクつきの募集文をコピー">
-            <Copy size={17} /> 募集文
+          {net.roomId && <span className="roomIdBadge">Room ID: {net.roomId}</span>}
+          <button onClick={onCopyInvite} disabled={!net.share} title="募集リンクをコピー">
+            <Copy size={17} /> 募集リンク
           </button>
           <button onClick={onCopyRules} title="Discordに固定するルール案内をコピー">
             <Copy size={17} /> ルール文
@@ -1840,17 +1839,9 @@ function LobbyScreen({
 
       <section className="lobbyGrid">
         <article className="lobbyPanel">
-          <h2>あなたの席</h2>
+          <h2>プレイヤー名</h2>
           <label>
-            席
-            <select value={myPlayerId} onChange={(e) => setMyPlayerId(Number(e.target.value))}>
-              {state.players.filter((player) => !player.isCpu || player.id === myPlayerId).map((player) => (
-                <option key={player.id} value={player.id}>{player.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            プレイヤー名
+            {state.players[myPlayerId].name}
             <input
               value={state.players[myPlayerId].name}
               onChange={(e) => onEvent({ type: "rename", name: e.target.value })}
@@ -1892,7 +1883,7 @@ function LobbyScreen({
               <Orbit size={18} /> CPUを入れて開始
             </button>
           )}
-          {!isParent && <p className="spaceportNote">ゲーム設定と開始操作は現在の席では行えません。</p>}
+          {!isParent && <p className="spaceportNote">ゲーム設定と開始操作は現在のプレイヤーでは行えません。</p>}
           {isParent && net.mode === "guest" && <p className="spaceportNote">この接続では開始操作を行えません。</p>}
           {!ownReady && <p className="spaceportNote">まず自分のプレイヤー名を入力してください。</p>}
           <button className="dangerButton" onClick={onDissolveRoom} disabled={!canParentControl}>
@@ -1912,7 +1903,7 @@ function LobbyScreen({
                 {player.isCpu && <span className="badge cpuBadge">CPU</span>}
                 {isReadyHuman(player) && <span className="badge readyBadge">準備OK</span>}
               </strong>
-              <span>席 {player.id + 1}</span>
+              <span>{String.fromCharCode(65 + player.id)}</span>
             </div>
             <p>{player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"}</p>
             {canParentControl && !isParentPlayer(player.id) && !player.isCpu && (
@@ -2058,8 +2049,9 @@ function App() {
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
   const [copyStatus, setCopyStatus] = useState("");
+  const [homeAlert, setHomeAlert] = useState("");
   const lastKickedAt = useRef(null);
-  const { net, host, join, send, closeNetwork } = usePeerRoom(state, setState, state.id, myPlayerId);
+  const { net, host, join, send, closeNetwork } = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert);
 
   function act(event) {
     const owned = { ...event, playerId: myPlayerId };
@@ -2137,10 +2129,16 @@ function App() {
   function joinRoomFromHome(input) {
     const roomId = roomIdFromInput(input);
     if (!roomId) return;
-    const playerId = playerIdFromInput(input, 1);
-    setMyPlayerId(playerId);
-    join(roomId, playerId);
+    join(roomId);
     setScreen("lobby");
+  }
+
+  function showRoomFullAlert() {
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+    setHomeAlert("参加可能人数をオーバーしたため、参加できませんでした");
+    window.setTimeout(() => setHomeAlert(""), 5000);
   }
 
   function startHumanGame() {
@@ -2164,7 +2162,7 @@ function App() {
   }
 
   if (screen === "home") {
-    return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} />;
+    return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} alert={homeAlert} />;
   }
 
   if (screen === "lobby" && !state.orderLocked) {
@@ -2172,10 +2170,9 @@ function App() {
       <LobbyScreen
         state={state}
         myPlayerId={myPlayerId}
-        setMyPlayerId={setMyPlayerId}
         net={net}
         onEvent={act}
-        onCopyInvite={() => copyToClipboard(discordInviteText(state, shareUrl), "募集文")}
+        onCopyInvite={() => copyToClipboard(inviteLinkText(shareUrl), "募集リンク")}
         onCopyRules={() => copyToClipboard(discordRulesText(), "ルール案内")}
         copyStatus={copyStatus}
         onStartHuman={startHumanGame}
@@ -2205,11 +2202,11 @@ function App() {
             <Copy size={17} /> 共有
           </button>
           <button
-            onClick={() => copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文")}
+            onClick={() => copyToClipboard(inviteLinkText(shareUrl), "募集リンク")}
             disabled={!net.share}
-            title="Discordに貼る募集文をコピー"
+            title="募集リンクをコピー"
           >
-            <Copy size={17} /> 募集文
+            <Copy size={17} /> 募集リンク
           </button>
           <button
             onClick={() => copyToClipboard(discordRulesText(), "ルール案内")}

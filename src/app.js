@@ -644,15 +644,8 @@ function phaseLabel(state) {
   if (state.turnStage === "production") return "資源獲得";
   return "メインフェーズ";
 }
-function discordInviteText(state, shareUrl) {
-  var mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
-  var players = state.players.map(function (player) {
-    return "".concat(player.name).concat(player.isCpu ? " CPU" : "");
-  }).join(" / ");
-  var order = state.orderLocked ? (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
-    return state.players[id].name;
-  }).join(" → ") : "これから決定";
-  return ["Beyondersの卓を立てました。", "\u53C2\u52A0\u30EA\u30F3\u30AF: ".concat(shareUrl), "\u30E2\u30FC\u30C9: ".concat(mode), "\u53C2\u52A0\u67A0: ".concat(players), "\u9806\u756A: ".concat(order), "Discordのボイスチャンネルで交渉しながら遊びましょう。"].join("\n");
+function inviteLinkText(shareUrl) {
+  return shareUrl;
 }
 function discordRulesText() {
   return ["Beyonders かんたん案内", "目的: 10VPを先に取ったプレイヤーの勝利。", "流れ: サイコロ → 資源獲得 → メインフェーズ。", "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。", "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。", "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。", "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"].join("\n");
@@ -1351,7 +1344,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "kickPlayer") {
-    var _PLAYERS$targetId;
+    var _PLAYERS$targetId, _PLAYERS$targetId2;
     if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked) return next;
     var targetId = Number(event.targetId);
     if (isParentPlayer(targetId)) return next;
@@ -1360,7 +1353,7 @@ function reducer(state, event) {
     target.name = ((_PLAYERS$targetId = PLAYERS[targetId]) === null || _PLAYERS$targetId === void 0 ? void 0 : _PLAYERS$targetId.name) || "Player ".concat(targetId + 1);
     target.isCpu = false;
     target.kickedAt = Date.now();
-    addLog(next, "\u5E2D ".concat(targetId + 1, " \u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u3092\u9000\u51FA\u3055\u305B\u307E\u3057\u305F\u3002"));
+    addLog(next, "".concat(((_PLAYERS$targetId2 = PLAYERS[targetId]) === null || _PLAYERS$targetId2 === void 0 ? void 0 : _PLAYERS$targetId2.name) || "Player ".concat(targetId + 1), " \u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u3092\u9000\u51FA\u3055\u305B\u307E\u3057\u305F\u3002"));
     return next;
   }
   if (event.type === "rename") {
@@ -2040,17 +2033,18 @@ function HelpPanel() {
     }
   }, "\u672A\u77E5\u3078\u306E\u65C5")), tab === "rules" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3001\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30CE\u30FC\u30DE\u30EB\u306F\u5730\u5F62\u3092\u30E9\u30F3\u30C0\u30E0\u3001\u6570\u5B57\u306F\u6C7A\u3081\u3089\u308C\u305F\u9806\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002\u30CF\u30FC\u30C9\u306F\u30F4\u30A9\u30A4\u30C9\u3092\u542B\u3080\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u300C\u7A7A\u304D\u67A0\u3092CPU\u88DC\u5B8C\u300D\u3067\u672A\u8A2D\u5B9A\u306E\u5E2D\u3092\u307E\u3068\u3081\u3066CPU\u306B\u3067\u304D\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3001\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30CE\u30FC\u30DE\u30EB\u306F\u5730\u5F62\u3092\u30E9\u30F3\u30C0\u30E0\u3001\u6570\u5B57\u306F\u6C7A\u3081\u3089\u308C\u305F\u9806\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002\u30CF\u30FC\u30C9\u306F\u30F4\u30A9\u30A4\u30C9\u3092\u542B\u3080\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u672A\u8A2D\u5B9A\u306E\u67A0\u3092\u307E\u3068\u3081\u3066CPU\u306B\u3067\u304D\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
   }, /*#__PURE__*/React.createElement("h2", null, "\u7528\u8A9E\u5BFE\u5FDC"), /*#__PURE__*/React.createElement("dl", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5C0F\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u57FA\u790E\u62E0\u70B9\u3002\u5EFA\u3066\u308B\u3068\u96A3\u63A5\u30BF\u30A4\u30EB\u304B\u3089\u8CC7\u6E90\u3092\u5F97\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5927\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u3092\u5F37\u5316\u3057\u305F\u62E0\u70B9\u3002\u7523\u51FA\u304C2\u500D\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u9818\u754C\u8DEF"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u540C\u58EB\u3092\u3064\u306A\u304E\u3001\u65B0\u3057\u3044\u5C0F\u90FD\u5E02\u3092\u7F6E\u304F\u305F\u3081\u306E\u63A5\u7D9A\u8DEF\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u6B21\u5143\u9580"), /*#__PURE__*/React.createElement("dd", null, "\u63A5\u3057\u3066\u3044\u308B\u3068\u901A\u4FE1\u4EA4\u6613\u304C\u6709\u5229\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30F4\u30A9\u30A4\u30C9"), /*#__PURE__*/React.createElement("dd", null, "\u8CC7\u6E90\u3092\u7523\u51FA\u3057\u306A\u3044\u7279\u6B8A\u30BF\u30A4\u30EB\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA"), /*#__PURE__*/React.createElement("dd", null, "\u3044\u308B\u30BF\u30A4\u30EB\u306E\u7523\u51FA\u3092\u6B62\u3081\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "TVA"), /*#__PURE__*/React.createElement("dd", null, "\u4F7F\u3046\u3068\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u52D5\u304B\u3057\u307E\u3059\u3002"))), /*#__PURE__*/React.createElement("h2", null, "\u8CC7\u6E90"), /*#__PURE__*/React.createElement("p", null, "\u9271\u7269\u6B21\u5143=\u30EC\u30A2\u30E1\u30BF\u30EB\u3001\u6A5F\u68B0\u6B21\u5143=\u30CA\u30CE\u30DE\u30B7\u30F3\u3001\u71B1\u5E2F\u6B21\u5143=\u5EFA\u6750\u3001\u5927\u8349\u539F=\u76AE\u9769\u3001\u80A5\u6C83\u306A\u5927\u5730=\u7A40\u7269\u3002")), tab === "cards" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
   }, /*#__PURE__*/React.createElement("h2", null, "\u672A\u77E5\u3078\u306E\u65C5\u30AB\u30FC\u30C9"), /*#__PURE__*/React.createElement("dl", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "TVA"), /*#__PURE__*/React.createElement("dd", null, "\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u307E\u3059\u30023\u679A\u4EE5\u4E0A\u3067\u6700\u5927TVA\u529B\u306E\u5019\u88DC\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u9818\u754C\u8DEF\u958B\u901A"), /*#__PURE__*/React.createElement("dd", null, "\u7121\u6599\u3067\u9818\u754C\u8DEF\u30922\u672C\u307E\u3067\u5EFA\u8A2D\u3067\u304D\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u62BC\u53CE"), /*#__PURE__*/React.createElement("dd", null, "\u9078\u3093\u3060\u8CC7\u6E90\u3092\u4ED6\u30D7\u30EC\u30A4\u30E4\u30FC\u5168\u54E1\u304B\u3089\u96C6\u3081\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u88DC\u7D66\u885B\u661F"), /*#__PURE__*/React.createElement("dd", null, "\u9078\u3093\u3060\u8CC7\u6E90\u30922\u3064\u53D7\u3051\u53D6\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u52DD\u5229\u8A18\u9332"), /*#__PURE__*/React.createElement("dd", null, "\u6301\u3063\u3066\u3044\u308B\u3060\u3051\u30671 VP\u3067\u3059\u3002")))));
 }
-function usePeerRoom(state, setState, roomId, myPlayerId) {
+function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomFull) {
   var _useState11 = useState({
       mode: "local",
       status: "ローカル",
-      share: ""
+      share: "",
+      roomId: ""
     }),
     _useState12 = _slicedToArray(_useState11, 2),
     net = _useState12[0],
@@ -2086,27 +2080,48 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     var peer = new window.Peer("star-".concat(roomId, "-").concat(Date.now().toString(36)));
     peerRef.current = peer;
     peer.on("open", function (id) {
-      var url = "".concat(location.origin).concat(location.pathname, "#join=").concat(id, "&p=1");
+      var url = "".concat(location.origin).concat(location.pathname, "#join=").concat(id);
       setNet({
         mode: "host",
         status: "ホスト中",
-        share: url
+        share: url,
+        roomId: id
       });
       history.replaceState(null, "", "#host=".concat(id, "&p=0"));
     });
     peer.on("connection", function (conn) {
-      connections.current.push(conn);
       conn.on("open", function () {
-        return conn.send({
-          type: "state",
-          state: stateRef.current
+        var usedIds = new Set([0].concat(_toConsumableArray(connections.current.map(function (item) {
+          return item.playerId;
+        }))));
+        var playerId = [1, 2, 3].find(function (id) {
+          return !usedIds.has(id);
+        });
+        if (playerId === undefined) {
+          var _conn$close;
+          conn.send({
+            type: "roomFull"
+          });
+          (_conn$close = conn.close) === null || _conn$close === void 0 || _conn$close.call(conn);
+          return;
+        }
+        connections.current.push({
+          conn: conn,
+          playerId: playerId
+        });
+        conn.send({
+          type: "assign",
+          playerId: playerId,
+          state: stateRef.current,
+          roomId: peer.id
         });
       });
       conn.on("data", function (message) {
         if (message.type === "event") {
           setState(function (prev) {
             var next = reducer(prev, message.event);
-            connections.current.forEach(function (c) {
+            connections.current.forEach(function (_ref31) {
+              var c = _ref31.conn;
               return c.open && c.send({
                 type: "state",
                 state: next
@@ -2116,25 +2131,46 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
           });
         }
       });
+      conn.on("close", function () {
+        connections.current = connections.current.filter(function (item) {
+          return item.conn !== conn;
+        });
+      });
     });
   }
   function join(hostId) {
-    var playerId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : myPlayerId;
     if (!window.Peer || !hostId) return;
     var peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", function () {
-      history.replaceState(null, "", "#join=".concat(hostId, "&p=").concat(playerId));
+      history.replaceState(null, "", "#join=".concat(hostId));
       var conn = peer.connect(hostId);
       connections.current = [conn];
       conn.on("open", function () {
         return setNet({
           mode: "guest",
-          status: "参加中",
-          share: location.href
+          status: "参加処理中",
+          share: location.href,
+          roomId: hostId
         });
       });
       conn.on("data", function (message) {
+        if (message.type === "assign") {
+          setMyPlayerId(message.playerId);
+          setNet({
+            mode: "guest",
+            status: "参加中",
+            share: location.href,
+            roomId: message.roomId || hostId
+          });
+          setState(message.state);
+          return;
+        }
+        if (message.type === "roomFull") {
+          closeNetwork();
+          onRoomFull === null || onRoomFull === void 0 || onRoomFull();
+          return;
+        }
         if (message.type === "state") setState(message.state);
       });
     });
@@ -2154,9 +2190,9 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
   }
   function closeNetwork() {
     var _peerRef$current, _peerRef$current$dest;
-    connections.current.forEach(function (conn) {
-      var _conn$close;
-      return (_conn$close = conn.close) === null || _conn$close === void 0 ? void 0 : _conn$close.call(conn);
+    connections.current.forEach(function (item) {
+      var _close, _ref32;
+      return (_close = (_ref32 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref32);
     });
     connections.current = [];
     (_peerRef$current = peerRef.current) === null || _peerRef$current === void 0 || (_peerRef$current$dest = _peerRef$current.destroy) === null || _peerRef$current$dest === void 0 || _peerRef$current$dest.call(_peerRef$current);
@@ -2164,11 +2200,13 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     setNet({
       mode: "local",
       status: window.Peer ? "オンライン接続を準備できます" : "ローカル",
-      share: ""
+      share: "",
+      roomId: ""
     });
   }
   useEffect(function () {
-    if (net.mode === "host") connections.current.forEach(function (c) {
+    if (net.mode === "host") connections.current.forEach(function (_ref33) {
+      var c = _ref33.conn;
       return c.open && c.send({
         type: "state",
         state: state
@@ -2210,23 +2248,11 @@ function roomIdFromInput(input) {
     return _params.get("join") || _params.get("host") || value;
   }
 }
-function playerIdFromInput(input) {
-  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-  var value = input.trim();
-  if (!value) return fallback;
-  try {
-    var url = new URL(value);
-    var id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
-    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
-  } catch (_unused2) {
-    var _id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
-    return Number.isInteger(_id) && _id >= 0 && _id <= 3 ? _id : fallback;
-  }
-}
-function HomeScreen(_ref31) {
-  var net = _ref31.net,
-    onCreate = _ref31.onCreate,
-    onJoin = _ref31.onJoin;
+function HomeScreen(_ref34) {
+  var net = _ref34.net,
+    onCreate = _ref34.onCreate,
+    onJoin = _ref34.onJoin,
+    alert = _ref34.alert;
   var _useState13 = useState(""),
     _useState14 = _slicedToArray(_useState13, 2),
     joinInput = _useState14[0],
@@ -2234,22 +2260,24 @@ function HomeScreen(_ref31) {
   var canJoin = Boolean(roomIdFromInput(joinInput));
   return /*#__PURE__*/React.createElement("main", {
     className: "homeMain"
-  }, /*#__PURE__*/React.createElement("section", {
+  }, alert && /*#__PURE__*/React.createElement("div", {
+    className: "homeAlert"
+  }, alert), /*#__PURE__*/React.createElement("section", {
     className: "homeHero"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u9818\u754C\u8DEF\u3092\u5EFA\u8A2D\u3057\u3066\u6B21\u5143\u3092\u958B\u62D3\u3057\u3066\u304D\u3001\u52DD\u5229\u3092\u76EE\u6307\u305D\u3046"))), /*#__PURE__*/React.createElement("section", {
     className: "homeActions"
-  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306B\u5171\u6709\u30EA\u30F3\u30AF\u3068Discord\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306BRoom ID\u3068\u52DF\u96C6\u30EA\u30F3\u30AF\u3092\u5171\u6709\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
     className: "primary homeButton",
     onClick: onCreate,
     disabled: !window.Peer
   }, /*#__PURE__*/React.createElement(RadioTower, {
     size: 18
-  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u5171\u6709\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306F\u90E8\u5C4BID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
+  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u52DF\u96C6\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306FRoom ID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
     value: joinInput,
     onChange: function onChange(e) {
       return setJoinInput(e.target.value);
     },
-    placeholder: "\u5171\u6709\u30EA\u30F3\u30AF\u307E\u305F\u306F\u90E8\u5C4BID"
+    placeholder: "\u52DF\u96C6\u30EA\u30F3\u30AF\u307E\u305F\u306FRoom ID"
   }), /*#__PURE__*/React.createElement("button", {
     className: "homeButton",
     onClick: function onClick() {
@@ -2262,18 +2290,17 @@ function HomeScreen(_ref31) {
     className: "homeNote"
   }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
 }
-function LobbyScreen(_ref32) {
-  var state = _ref32.state,
-    myPlayerId = _ref32.myPlayerId,
-    setMyPlayerId = _ref32.setMyPlayerId,
-    net = _ref32.net,
-    onEvent = _ref32.onEvent,
-    onCopyInvite = _ref32.onCopyInvite,
-    onCopyRules = _ref32.onCopyRules,
-    copyStatus = _ref32.copyStatus,
-    onStartHuman = _ref32.onStartHuman,
-    onStartCpu = _ref32.onStartCpu,
-    onDissolveRoom = _ref32.onDissolveRoom;
+function LobbyScreen(_ref35) {
+  var state = _ref35.state,
+    myPlayerId = _ref35.myPlayerId,
+    net = _ref35.net,
+    onEvent = _ref35.onEvent,
+    onCopyInvite = _ref35.onCopyInvite,
+    onCopyRules = _ref35.onCopyRules,
+    copyStatus = _ref35.copyStatus,
+    onStartHuman = _ref35.onStartHuman,
+    onStartCpu = _ref35.onStartCpu,
+    onDissolveRoom = _ref35.onDissolveRoom;
   var readyCount = readyHumanCount(state);
   var ownReady = isReadyHuman(state.players[myPlayerId]);
   var isParent = isParentPlayer(myPlayerId);
@@ -2284,15 +2311,17 @@ function LobbyScreen(_ref32) {
     className: "lobbyMain"
   }, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5F85\u6A5F\u4E2D\u3002\u5E2D\u3092\u9078\u3073\u3001\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304B\u3089\u958B\u59CB\u3057\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5F85\u6A5F\u4E2D\u3002\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304B\u3089\u958B\u59CB\u3057\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", {
     className: "net"
-  }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", null, net.status), net.roomId && /*#__PURE__*/React.createElement("span", {
+    className: "roomIdBadge"
+  }, "Room ID: ", net.roomId), /*#__PURE__*/React.createElement("button", {
     onClick: onCopyInvite,
     disabled: !net.share,
-    title: "\u5171\u6709\u30EA\u30F3\u30AF\u3064\u304D\u306E\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+    title: "\u52DF\u96C6\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC"
   }, /*#__PURE__*/React.createElement(Copy, {
     size: 17
-  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+  }), " \u52DF\u96C6\u30EA\u30F3\u30AF"), /*#__PURE__*/React.createElement("button", {
     onClick: onCopyRules,
     title: "Discord\u306B\u56FA\u5B9A\u3059\u308B\u30EB\u30FC\u30EB\u6848\u5185\u3092\u30B3\u30D4\u30FC"
   }, /*#__PURE__*/React.createElement(Copy, {
@@ -2303,19 +2332,7 @@ function LobbyScreen(_ref32) {
     className: "lobbyGrid"
   }, /*#__PURE__*/React.createElement("article", {
     className: "lobbyPanel"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u3042\u306A\u305F\u306E\u5E2D"), /*#__PURE__*/React.createElement("label", null, "\u5E2D", /*#__PURE__*/React.createElement("select", {
-    value: myPlayerId,
-    onChange: function onChange(e) {
-      return setMyPlayerId(Number(e.target.value));
-    }
-  }, state.players.filter(function (player) {
-    return !player.isCpu || player.id === myPlayerId;
-  }).map(function (player) {
-    return /*#__PURE__*/React.createElement("option", {
-      key: player.id,
-      value: player.id
-    }, player.name);
-  }))), /*#__PURE__*/React.createElement("label", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D", /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D"), /*#__PURE__*/React.createElement("label", null, state.players[myPlayerId].name, /*#__PURE__*/React.createElement("input", {
     value: state.players[myPlayerId].name,
     onChange: function onChange(e) {
       return onEvent({
@@ -2368,7 +2385,7 @@ function LobbyScreen(_ref32) {
     size: 18
   }), " CPU\u3092\u5165\u308C\u3066\u958B\u59CB"), !isParent && /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
-  }, "\u30B2\u30FC\u30E0\u8A2D\u5B9A\u3068\u958B\u59CB\u64CD\u4F5C\u306F\u73FE\u5728\u306E\u5E2D\u3067\u306F\u884C\u3048\u307E\u305B\u3093\u3002"), isParent && net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
+  }, "\u30B2\u30FC\u30E0\u8A2D\u5B9A\u3068\u958B\u59CB\u64CD\u4F5C\u306F\u73FE\u5728\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u3067\u306F\u884C\u3048\u307E\u305B\u3093\u3002"), isParent && net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
   }, "\u3053\u306E\u63A5\u7D9A\u3067\u306F\u958B\u59CB\u64CD\u4F5C\u3092\u884C\u3048\u307E\u305B\u3093\u3002"), !ownReady && /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
@@ -2390,7 +2407,7 @@ function LobbyScreen(_ref32) {
       className: "badge cpuBadge"
     }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
       className: "badge readyBadge"
-    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, "\u5E2D ", player.id + 1)), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"), canParentControl && !isParentPlayer(player.id) && !player.isCpu && /*#__PURE__*/React.createElement("button", {
+    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, String.fromCharCode(65 + player.id))), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"), canParentControl && !isParentPlayer(player.id) && !player.isCpu && /*#__PURE__*/React.createElement("button", {
       className: "cpuToggle dangerButton",
       onClick: function onClick() {
         return onEvent({
@@ -2401,10 +2418,10 @@ function LobbyScreen(_ref32) {
     }, "kick"));
   })));
 }
-function Board(_ref33) {
-  var state = _ref33.state,
-    onEvent = _ref33.onEvent,
-    myPlayerId = _ref33.myPlayerId;
+function Board(_ref36) {
+  var state = _ref36.state,
+    onEvent = _ref36.onEvent,
+    myPlayerId = _ref36.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2640,8 +2657,12 @@ function App() {
     _useState26 = _slicedToArray(_useState25, 2),
     copyStatus = _useState26[0],
     setCopyStatus = _useState26[1];
+  var _useState27 = useState(""),
+    _useState28 = _slicedToArray(_useState27, 2),
+    homeAlert = _useState28[0],
+    setHomeAlert = _useState28[1];
   var lastKickedAt = useRef(null);
-  var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId),
+  var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
     join = _usePeerRoom.join,
@@ -2730,10 +2751,17 @@ function App() {
   function joinRoomFromHome(input) {
     var roomId = roomIdFromInput(input);
     if (!roomId) return;
-    var playerId = playerIdFromInput(input, 1);
-    setMyPlayerId(playerId);
-    join(roomId, playerId);
+    join(roomId);
     setScreen("lobby");
+  }
+  function showRoomFullAlert() {
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+    setHomeAlert("参加可能人数をオーバーしたため、参加できませんでした");
+    window.setTimeout(function () {
+      return setHomeAlert("");
+    }, 5000);
   }
   function startHumanGame() {
     if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
@@ -2766,18 +2794,18 @@ function App() {
     return /*#__PURE__*/React.createElement(HomeScreen, {
       net: net,
       onCreate: createRoomFromHome,
-      onJoin: joinRoomFromHome
+      onJoin: joinRoomFromHome,
+      alert: homeAlert
     });
   }
   if (screen === "lobby" && !state.orderLocked) {
     return /*#__PURE__*/React.createElement(LobbyScreen, {
       state: state,
       myPlayerId: myPlayerId,
-      setMyPlayerId: setMyPlayerId,
       net: net,
       onEvent: act,
       onCopyInvite: function onCopyInvite() {
-        return copyToClipboard(discordInviteText(state, shareUrl), "募集文");
+        return copyToClipboard(inviteLinkText(shareUrl), "募集リンク");
       },
       onCopyRules: function onCopyRules() {
         return copyToClipboard(discordRulesText(), "ルール案内");
@@ -2807,13 +2835,13 @@ function App() {
     size: 17
   }), " \u5171\u6709"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      return copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文");
+      return copyToClipboard(inviteLinkText(shareUrl), "募集リンク");
     },
     disabled: !net.share,
-    title: "Discord\u306B\u8CBC\u308B\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+    title: "\u52DF\u96C6\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC"
   }, /*#__PURE__*/React.createElement(Copy, {
     size: 17
-  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+  }), " \u52DF\u96C6\u30EA\u30F3\u30AF"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       return copyToClipboard(discordRulesText(), "ルール案内");
     },
