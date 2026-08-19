@@ -380,6 +380,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     board,
     players: PLAYERS.map((player) => ({
       ...player,
+      discord: "",
       isCpu: false,
       resources: emptyResources(),
       hiddenNewFrontiers: [],
@@ -496,7 +497,10 @@ function phaseLabel(state) {
 
 function discordInviteText(state, shareUrl) {
   const mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
-  const players = state.players.map((player) => `${player.name}${player.isCpu ? " CPU" : ""}`).join(" / ");
+  const players = state.players.map((player) => {
+    const discord = player.discord ? ` Discord:${player.discord}` : "";
+    return `${player.name}${player.isCpu ? " CPU" : ""}${discord}`;
+  }).join(" / ");
   const order = state.orderLocked
     ? (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ")
     : "これから決定";
@@ -944,6 +948,10 @@ function reducer(state, event) {
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || `Player ${actor + 1}`;
+    return next;
+  }
+  if (event.type === "setDiscord") {
+    next.players[actor].discord = event.discord.replace(/\s+/g, " ").trim().slice(0, 32);
     return next;
   }
   if (event.type === "setCpu") {
@@ -1891,6 +1899,7 @@ function App() {
               </strong>
               <span>{getVp(state, player.id)} VP</span>
             </div>
+            {player.discord && <p className="discordTag">Discord: {player.discord}</p>}
             <p>{visibleResourceText(player, myPlayerId)}</p>
             <small>TVA {player.playedTv} / 未知への旅 {player.hiddenNewFrontiers.length}枚 / 公開済み: {publicPlayedFrontiers(player)} / {spaceportText(state, player.id)}</small>
             <button
@@ -1930,7 +1939,19 @@ function App() {
                 ))}
               </select>
             </label>
-            <input value={me.name} onChange={(e) => act({ type: "rename", name: e.target.value })} disabled={me.isCpu} />
+            <label>
+              プレイヤー名
+              <input value={me.name} onChange={(e) => act({ type: "rename", name: e.target.value })} disabled={me.isCpu} />
+            </label>
+            <label>
+              Discord名
+              <input
+                value={me.discord || ""}
+                onChange={(e) => act({ type: "setDiscord", discord: e.target.value })}
+                placeholder="例: yourname / @yourname"
+                disabled={me.isCpu}
+              />
+            </label>
           </div>
 
           <ResourceHand player={me} />

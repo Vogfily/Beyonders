@@ -514,6 +514,7 @@ function createGame() {
     board: board,
     players: PLAYERS.map(function (player) {
       return _objectSpread(_objectSpread({}, player), {}, {
+        discord: "",
         isCpu: false,
         resources: emptyResources(),
         hiddenNewFrontiers: [],
@@ -645,7 +646,8 @@ function phaseLabel(state) {
 function discordInviteText(state, shareUrl) {
   var mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
   var players = state.players.map(function (player) {
-    return "".concat(player.name).concat(player.isCpu ? " CPU" : "");
+    var discord = player.discord ? " Discord:".concat(player.discord) : "";
+    return "".concat(player.name).concat(player.isCpu ? " CPU" : "").concat(discord);
   }).join(" / ");
   var order = state.orderLocked ? (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
     return state.players[id].name;
@@ -1327,6 +1329,10 @@ function reducer(state, event) {
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || "Player ".concat(actor + 1);
+    return next;
+  }
+  if (event.type === "setDiscord") {
+    next.players[actor].discord = event.discord.replace(/\s+/g, " ").trim().slice(0, 32);
     return next;
   }
   if (event.type === "setCpu") {
@@ -2463,7 +2469,9 @@ function App() {
       className: "badge"
     }, "\u6700\u9577\u9818\u754C\u8DEF"), player.bonus.largestTv && /*#__PURE__*/React.createElement("span", {
       className: "badge"
-    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
+    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), player.discord && /*#__PURE__*/React.createElement("p", {
+      className: "discordTag"
+    }, "Discord: ", player.discord), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
       className: "cpuToggle",
       onClick: function onClick() {
         return act({
@@ -2511,7 +2519,7 @@ function App() {
       key: p.id,
       value: p.id
     }, p.name, p.isCpu ? " CPU" : "");
-  }))), /*#__PURE__*/React.createElement("input", {
+  }))), /*#__PURE__*/React.createElement("label", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D", /*#__PURE__*/React.createElement("input", {
     value: me.name,
     onChange: function onChange(e) {
       return act({
@@ -2520,7 +2528,17 @@ function App() {
       });
     },
     disabled: me.isCpu
-  })), /*#__PURE__*/React.createElement(ResourceHand, {
+  })), /*#__PURE__*/React.createElement("label", null, "Discord\u540D", /*#__PURE__*/React.createElement("input", {
+    value: me.discord || "",
+    onChange: function onChange(e) {
+      return act({
+        type: "setDiscord",
+        discord: e.target.value
+      });
+    },
+    placeholder: "\u4F8B: yourname / @yourname",
+    disabled: me.isCpu
+  }))), /*#__PURE__*/React.createElement(ResourceHand, {
     player: me
   }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
