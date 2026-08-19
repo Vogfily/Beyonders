@@ -671,6 +671,9 @@ function readyHumanCount(state) {
 function isParentPlayer(playerId) {
   return Number(playerId) === 0;
 }
+function sanitizePlayerName(name) {
+  return name.replace(/[^A-Za-z ]/g, "").replace(/\s+/g, " ").slice(0, 18);
+}
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -1361,7 +1364,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "rename") {
-    next.players[actor].name = event.name.slice(0, 18) || "Player ".concat(actor + 1);
+    next.players[actor].name = sanitizePlayerName(event.name) || "Player ".concat(actor + 1);
     next.players[actor].kickedAt = null;
     return next;
   }
@@ -2321,7 +2324,9 @@ function LobbyScreen(_ref32) {
       });
     },
     disabled: state.players[myPlayerId].isCpu,
-    placeholder: "\u540D\u524D\u3092\u5165\u529B"
+    placeholder: "Alphabet only",
+    inputMode: "latin",
+    pattern: "[A-Za-z ]*"
   }))), /*#__PURE__*/React.createElement("article", {
     className: "lobbyPanel"
   }, /*#__PURE__*/React.createElement("h2", null, "\u30B2\u30FC\u30E0\u8A2D\u5B9A"), /*#__PURE__*/React.createElement("div", {
@@ -3066,6 +3071,12 @@ function App() {
     return /*#__PURE__*/React.createElement("p", {
       key: index
     }, line);
-  })));
+  })), /*#__PURE__*/React.createElement("section", {
+    className: "exitGame"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "dangerButton",
+    onClick: dissolveRoom,
+    disabled: !isParentPlayer(myPlayerId) || net.mode === "guest"
+  }, "Exit the Game")));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

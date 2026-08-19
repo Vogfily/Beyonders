@@ -237,8 +237,10 @@ h2 {
 }
 
 .homeActions h2 {
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
   margin: 0;
   font-size: 22px;
+  font-weight: 800;
 }
 
 .homeActions p,
@@ -804,6 +806,8 @@ h2 {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  letter-spacing: 0;
 }
 
 .badge {
@@ -856,6 +860,17 @@ h2 {
 
 .log .privateLog {
   color: #fff3a8;
+}
+
+.exitGame {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+  padding-bottom: 8px;
+}
+
+.exitGame button {
+  min-width: 180px;
 }
 
 .winner {

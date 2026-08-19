@@ -540,6 +540,10 @@ function isParentPlayer(playerId) {
   return Number(playerId) === 0;
 }
 
+function sanitizePlayerName(name) {
+  return name.replace(/[^A-Za-z ]/g, "").replace(/\s+/g, " ").slice(0, 18);
+}
+
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -979,7 +983,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "rename") {
-    next.players[actor].name = event.name.slice(0, 18) || `Player ${actor + 1}`;
+    next.players[actor].name = sanitizePlayerName(event.name) || `Player ${actor + 1}`;
     next.players[actor].kickedAt = null;
     return next;
   }
@@ -1851,7 +1855,9 @@ function LobbyScreen({
               value={state.players[myPlayerId].name}
               onChange={(e) => onEvent({ type: "rename", name: e.target.value })}
               disabled={state.players[myPlayerId].isCpu}
-              placeholder="名前を入力"
+              placeholder="Alphabet only"
+              inputMode="latin"
+              pattern="[A-Za-z ]*"
             />
           </label>
         </article>
@@ -2350,6 +2356,12 @@ function App() {
         {state.winner !== null && <div className="winner">{state.players[state.winner].name} の勝利</div>}
         {(state.privateMessages || []).filter((message) => message.to === myPlayerId).map((message, index) => <p className="privateLog" key={`private-${index}`}>{message.text}</p>)}
         {state.log.map((line, index) => <p key={index}>{line}</p>)}
+      </section>
+
+      <section className="exitGame">
+        <button className="dangerButton" onClick={dissolveRoom} disabled={!isParentPlayer(myPlayerId) || net.mode === "guest"}>
+          Exit the Game
+        </button>
       </section>
     </main>
   );
