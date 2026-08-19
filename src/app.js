@@ -2856,7 +2856,7 @@ function App() {
     history.replaceState(null, "", location.pathname);
     if (reason === "hostDisconnected") {
       showHomeAlert("ホストが退出したため、ゲームが終了されました。");
-    } else {
+    } else if (!isParentPlayer(myPlayerId)) {
       showHomeAlert("ホストがゲームを終了しました。");
     }
   }, [state.roomClosedAt]);
