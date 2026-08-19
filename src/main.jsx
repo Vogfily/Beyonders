@@ -380,6 +380,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     board,
     players: PLAYERS.map((player) => ({
       ...player,
+      kickedAt: null,
       isCpu: false,
       resources: emptyResources(),
       hiddenNewFrontiers: [],
@@ -412,6 +413,7 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     pendingSteal: null,
     criminalMover: null,
     privateMessages: [],
+    roomClosedAt: null,
     log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
     winner: null,
   };
@@ -532,6 +534,10 @@ function isReadyHuman(player) {
 
 function readyHumanCount(state) {
   return state.players.filter(isReadyHuman).length;
+}
+
+function isParentPlayer(playerId) {
+  return Number(playerId) === 0;
 }
 
 function isMainPhase(state) {
@@ -951,11 +957,30 @@ function reducer(state, event) {
   const next = structuredClone(state);
   const actor = event.playerId ?? currentPlayer(next).id;
   const player = next.players[actor];
-  if (next.winner && event.type !== "reset") return next;
+  if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
 
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
+  if (event.type === "dissolveRoom") {
+    if (!isParentPlayer(actor)) return next;
+    next.roomClosedAt = Date.now();
+    addLog(next, "部屋が解散されました。");
+    return next;
+  }
+  if (event.type === "kickPlayer") {
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked) return next;
+    const targetId = Number(event.targetId);
+    if (isParentPlayer(targetId)) return next;
+    const target = next.players[targetId];
+    if (!target) return next;
+    target.name = PLAYERS[targetId]?.name || `Player ${targetId + 1}`;
+    target.isCpu = false;
+    target.kickedAt = Date.now();
+    addLog(next, `席 ${targetId + 1} のプレイヤーを退出させました。`);
+    return next;
+  }
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || `Player ${actor + 1}`;
+    next.players[actor].kickedAt = null;
     return next;
   }
   if (event.type === "setCpu") {
@@ -974,7 +999,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "fillCpu") {
-    if (next.phase !== "setup" || next.orderLocked) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked) return next;
     const filled = [];
     next.players.forEach((target) => {
       if (!isUnclaimedPlayerSeat(target, actor)) return;
@@ -986,7 +1011,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "setGameMode") {
-    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
     const gameMode = event.gameMode === "hard" ? "hard" : "normal";
     if (next.gameMode === gameMode) return next;
     next.gameMode = gameMode;
@@ -998,7 +1023,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "randomizeOrder") {
-    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
     const order = randomTurnOrder();
     next.turnOrder = order;
     next.setupOrder = setupOrderFor(order);
@@ -1673,6 +1698,14 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     return false;
   }
 
+  function closeNetwork() {
+    connections.current.forEach((conn) => conn.close?.());
+    connections.current = [];
+    peerRef.current?.destroy?.();
+    peerRef.current = null;
+    setNet({ mode: "local", status: window.Peer ? "オンライン接続を準備できます" : "ローカル", share: "" });
+  }
+
   useEffect(() => {
     if (net.mode === "host") connections.current.forEach((c) => c.open && c.send({ type: "state", state }));
   }, [state, net.mode]);
@@ -1691,7 +1724,7 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     }
   }, []);
 
-  return { net, host, join, send };
+  return { net, host, join, send, closeNetwork };
 }
 
 function roomIdFromInput(input) {
@@ -1728,7 +1761,7 @@ function HomeScreen({ net, onCreate, onJoin }) {
       <section className="homeHero">
         <div>
           <h1>Beyonders</h1>
-          <p>次元を開拓し、領界路を伸ばし、Discordで交渉しながら10 VPを目指すオンライン卓。</p>
+          <p>領界路を建設して次元を開拓してき、勝利を目指そう</p>
         </div>
       </section>
 
@@ -1774,12 +1807,14 @@ function LobbyScreen({
   copyStatus,
   onStartHuman,
   onStartCpu,
+  onDissolveRoom,
 }) {
   const readyCount = readyHumanCount(state);
   const ownReady = isReadyHuman(state.players[myPlayerId]);
-  const canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
-  const canStartHuman = canHostStart && readyCount === 4;
-  const canStartCpu = canHostStart && ownReady && readyCount < 4;
+  const isParent = isParentPlayer(myPlayerId);
+  const canParentControl = isParent && net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  const canStartHuman = canParentControl && readyCount === 4;
+  const canStartCpu = canParentControl && ownReady && readyCount < 4;
   return (
     <main className="lobbyMain">
       <section className="topbar">
@@ -1827,7 +1862,7 @@ function LobbyScreen({
             <button
               className={state.gameMode === "normal" ? "selected" : ""}
               onClick={() => onEvent({ type: "setGameMode", gameMode: "normal" })}
-              disabled={!canHostStart}
+              disabled={!canParentControl}
               title="数字の並び順を固定した標準盤面"
             >
               ノーマル
@@ -1835,7 +1870,7 @@ function LobbyScreen({
             <button
               className={state.gameMode === "hard" ? "selected" : ""}
               onClick={() => onEvent({ type: "setGameMode", gameMode: "hard" })}
-              disabled={!canHostStart}
+              disabled={!canParentControl}
               title="地形と数字をすべてランダムにした盤面"
             >
               ハード
@@ -1851,8 +1886,12 @@ function LobbyScreen({
               <Orbit size={18} /> CPUを入れて開始
             </button>
           )}
-          {net.mode === "guest" && <p className="spaceportNote">開始操作はホストが行います。</p>}
+          {!isParent && <p className="spaceportNote">ゲーム設定と開始操作は現在の席では行えません。</p>}
+          {isParent && net.mode === "guest" && <p className="spaceportNote">この接続では開始操作を行えません。</p>}
           {!ownReady && <p className="spaceportNote">まず自分のプレイヤー名を入力してください。</p>}
+          <button className="dangerButton" onClick={onDissolveRoom} disabled={!canParentControl}>
+            部屋を解散
+          </button>
         </article>
       </section>
 
@@ -1868,6 +1907,11 @@ function LobbyScreen({
               <span>席 {player.id + 1}</span>
             </div>
             <p>{player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"}</p>
+            {canParentControl && !isParentPlayer(player.id) && !player.isCpu && (
+              <button className="cpuToggle dangerButton" onClick={() => onEvent({ type: "kickPlayer", targetId: player.id })}>
+                kick
+              </button>
+            )}
           </article>
         ))}
       </section>
@@ -2005,7 +2049,8 @@ function App() {
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
   const [copyStatus, setCopyStatus] = useState("");
-  const { net, host, join, send } = usePeerRoom(state, setState, state.id, myPlayerId);
+  const lastKickedAt = useRef(null);
+  const { net, host, join, send, closeNetwork } = usePeerRoom(state, setState, state.id, myPlayerId);
 
   function act(event) {
     const owned = { ...event, playerId: myPlayerId };
@@ -2016,6 +2061,24 @@ function App() {
   useEffect(() => {
     if (state.orderLocked && screen === "lobby") setScreen("game");
   }, [state.orderLocked, screen]);
+
+  useEffect(() => {
+    if (!state.roomClosedAt) return;
+    closeNetwork();
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+  }, [state.roomClosedAt]);
+
+  useEffect(() => {
+    const kickedAt = state.players[myPlayerId]?.kickedAt;
+    if (!kickedAt || kickedAt === lastKickedAt.current || isParentPlayer(myPlayerId)) return;
+    lastKickedAt.current = kickedAt;
+    closeNetwork();
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+  }, [state.players, myPlayerId]);
 
   useEffect(() => {
     if (net.mode === "guest") return;
@@ -2072,17 +2135,23 @@ function App() {
   }
 
   function startHumanGame() {
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
     act({ type: "randomizeOrder" });
     setScreen("game");
   }
 
   function startCpuGame() {
-    if (net.mode === "guest") return;
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
     setState((prev) => {
       const filled = reducer(prev, { type: "fillCpu", playerId: myPlayerId });
       return reducer(filled, { type: "randomizeOrder", playerId: myPlayerId });
     });
     setScreen("game");
+  }
+
+  function dissolveRoom() {
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
+    act({ type: "dissolveRoom" });
   }
 
   if (screen === "home") {
@@ -2102,6 +2171,7 @@ function App() {
         copyStatus={copyStatus}
         onStartHuman={startHumanGame}
         onStartCpu={startCpuGame}
+        onDissolveRoom={dissolveRoom}
       />
     );
   }

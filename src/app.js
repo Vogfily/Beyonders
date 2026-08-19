@@ -514,6 +514,7 @@ function createGame() {
     board: board,
     players: PLAYERS.map(function (player) {
       return _objectSpread(_objectSpread({}, player), {}, {
+        kickedAt: null,
         isCpu: false,
         resources: emptyResources(),
         hiddenNewFrontiers: [],
@@ -550,6 +551,7 @@ function createGame() {
     pendingSteal: null,
     criminalMover: null,
     privateMessages: [],
+    roomClosedAt: null,
     log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
     winner: null
   };
@@ -665,6 +667,9 @@ function isReadyHuman(player) {
 }
 function readyHumanCount(state) {
   return state.players.filter(isReadyHuman).length;
+}
+function isParentPlayer(playerId) {
+  return Number(playerId) === 0;
 }
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
@@ -1334,29 +1339,49 @@ function reducer(state, event) {
   var next = structuredClone(state);
   var actor = (_event$playerId = event.playerId) !== null && _event$playerId !== void 0 ? _event$playerId : currentPlayer(next).id;
   var player = next.players[actor];
-  if (next.winner && event.type !== "reset") return next;
+  if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
+  if (event.type === "dissolveRoom") {
+    if (!isParentPlayer(actor)) return next;
+    next.roomClosedAt = Date.now();
+    addLog(next, "部屋が解散されました。");
+    return next;
+  }
+  if (event.type === "kickPlayer") {
+    var _PLAYERS$targetId;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked) return next;
+    var targetId = Number(event.targetId);
+    if (isParentPlayer(targetId)) return next;
+    var target = next.players[targetId];
+    if (!target) return next;
+    target.name = ((_PLAYERS$targetId = PLAYERS[targetId]) === null || _PLAYERS$targetId === void 0 ? void 0 : _PLAYERS$targetId.name) || "Player ".concat(targetId + 1);
+    target.isCpu = false;
+    target.kickedAt = Date.now();
+    addLog(next, "\u5E2D ".concat(targetId + 1, " \u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u3092\u9000\u51FA\u3055\u305B\u307E\u3057\u305F\u3002"));
+    return next;
+  }
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || "Player ".concat(actor + 1);
+    next.players[actor].kickedAt = null;
     return next;
   }
   if (event.type === "setCpu") {
     if (next.phase !== "setup" || next.orderLocked) return next;
-    var targetId = Number(event.targetId);
-    var target = next.players[targetId];
-    if (!target) return next;
-    target.isCpu = Boolean(event.isCpu);
-    if (target.isCpu) {
-      target.name = target.name.startsWith("CPU") ? target.name : "CPU ".concat(String.fromCharCode(65 + targetId));
-      addLog(next, "".concat(target.name, " \u304CCPU\u3068\u3057\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"));
+    var _targetId = Number(event.targetId);
+    var _target = next.players[_targetId];
+    if (!_target) return next;
+    _target.isCpu = Boolean(event.isCpu);
+    if (_target.isCpu) {
+      _target.name = _target.name.startsWith("CPU") ? _target.name : "CPU ".concat(String.fromCharCode(65 + _targetId));
+      addLog(next, "".concat(_target.name, " \u304CCPU\u3068\u3057\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"));
     } else {
-      target.name = target.name.startsWith("CPU") ? "Player ".concat(targetId + 1) : target.name;
-      addLog(next, "".concat(target.name, " \u304C\u30D7\u30EC\u30A4\u30E4\u30FC\u67A0\u306B\u623B\u308A\u307E\u3057\u305F\u3002"));
+      _target.name = _target.name.startsWith("CPU") ? "Player ".concat(_targetId + 1) : _target.name;
+      addLog(next, "".concat(_target.name, " \u304C\u30D7\u30EC\u30A4\u30E4\u30FC\u67A0\u306B\u623B\u308A\u307E\u3057\u305F\u3002"));
     }
     return next;
   }
   if (event.type === "fillCpu") {
-    if (next.phase !== "setup" || next.orderLocked) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked) return next;
     var filled = [];
     next.players.forEach(function (target) {
       if (!isUnclaimedPlayerSeat(target, actor)) return;
@@ -1369,7 +1394,7 @@ function reducer(state, event) {
   }
   if (event.type === "setGameMode") {
     var _voidTile$id;
-    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
     var gameMode = event.gameMode === "hard" ? "hard" : "normal";
     if (next.gameMode === gameMode) return next;
     next.gameMode = gameMode;
@@ -1383,7 +1408,7 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "randomizeOrder") {
-    if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
+    if (!isParentPlayer(actor) || next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
     var order = randomTurnOrder();
     next.turnOrder = order;
     next.setupOrder = setupOrderFor(order);
@@ -2124,6 +2149,21 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     }
     return false;
   }
+  function closeNetwork() {
+    var _peerRef$current, _peerRef$current$dest;
+    connections.current.forEach(function (conn) {
+      var _conn$close;
+      return (_conn$close = conn.close) === null || _conn$close === void 0 ? void 0 : _conn$close.call(conn);
+    });
+    connections.current = [];
+    (_peerRef$current = peerRef.current) === null || _peerRef$current === void 0 || (_peerRef$current$dest = _peerRef$current.destroy) === null || _peerRef$current$dest === void 0 || _peerRef$current$dest.call(_peerRef$current);
+    peerRef.current = null;
+    setNet({
+      mode: "local",
+      status: window.Peer ? "オンライン接続を準備できます" : "ローカル",
+      share: ""
+    });
+  }
   useEffect(function () {
     if (net.mode === "host") connections.current.forEach(function (c) {
       return c.open && c.send({
@@ -2151,7 +2191,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     net: net,
     host: host,
     join: join,
-    send: send
+    send: send,
+    closeNetwork: closeNetwork
   };
 }
 function roomIdFromInput(input) {
@@ -2192,7 +2233,7 @@ function HomeScreen(_ref31) {
     className: "homeMain"
   }, /*#__PURE__*/React.createElement("section", {
     className: "homeHero"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u6B21\u5143\u3092\u958B\u62D3\u3057\u3001\u9818\u754C\u8DEF\u3092\u4F38\u3070\u3057\u3001Discord\u3067\u4EA4\u6E09\u3057\u306A\u304C\u308910 VP\u3092\u76EE\u6307\u3059\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002"))), /*#__PURE__*/React.createElement("section", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u9818\u754C\u8DEF\u3092\u5EFA\u8A2D\u3057\u3066\u6B21\u5143\u3092\u958B\u62D3\u3057\u3066\u304D\u3001\u52DD\u5229\u3092\u76EE\u6307\u305D\u3046"))), /*#__PURE__*/React.createElement("section", {
     className: "homeActions"
   }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306B\u5171\u6709\u30EA\u30F3\u30AF\u3068Discord\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
     className: "primary homeButton",
@@ -2228,12 +2269,14 @@ function LobbyScreen(_ref32) {
     onCopyRules = _ref32.onCopyRules,
     copyStatus = _ref32.copyStatus,
     onStartHuman = _ref32.onStartHuman,
-    onStartCpu = _ref32.onStartCpu;
+    onStartCpu = _ref32.onStartCpu,
+    onDissolveRoom = _ref32.onDissolveRoom;
   var readyCount = readyHumanCount(state);
   var ownReady = isReadyHuman(state.players[myPlayerId]);
-  var canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
-  var canStartHuman = canHostStart && readyCount === 4;
-  var canStartCpu = canHostStart && ownReady && readyCount < 4;
+  var isParent = isParentPlayer(myPlayerId);
+  var canParentControl = isParent && net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  var canStartHuman = canParentControl && readyCount === 4;
+  var canStartCpu = canParentControl && ownReady && readyCount < 4;
   return /*#__PURE__*/React.createElement("main", {
     className: "lobbyMain"
   }, /*#__PURE__*/React.createElement("section", {
@@ -2292,7 +2335,7 @@ function LobbyScreen(_ref32) {
         gameMode: "normal"
       });
     },
-    disabled: !canHostStart,
+    disabled: !canParentControl,
     title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
   }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
     className: state.gameMode === "hard" ? "selected" : "",
@@ -2302,7 +2345,7 @@ function LobbyScreen(_ref32) {
         gameMode: "hard"
       });
     },
-    disabled: !canHostStart,
+    disabled: !canParentControl,
     title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
   }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
@@ -2318,11 +2361,17 @@ function LobbyScreen(_ref32) {
     disabled: !canStartCpu
   }, /*#__PURE__*/React.createElement(Orbit, {
     size: 18
-  }), " CPU\u3092\u5165\u308C\u3066\u958B\u59CB"), net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
+  }), " CPU\u3092\u5165\u308C\u3066\u958B\u59CB"), !isParent && /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
-  }, "\u958B\u59CB\u64CD\u4F5C\u306F\u30DB\u30B9\u30C8\u304C\u884C\u3044\u307E\u3059\u3002"), !ownReady && /*#__PURE__*/React.createElement("p", {
+  }, "\u30B2\u30FC\u30E0\u8A2D\u5B9A\u3068\u958B\u59CB\u64CD\u4F5C\u306F\u73FE\u5728\u306E\u5E2D\u3067\u306F\u884C\u3048\u307E\u305B\u3093\u3002"), isParent && net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
     className: "spaceportNote"
-  }, "\u307E\u305A\u81EA\u5206\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"))), /*#__PURE__*/React.createElement("section", {
+  }, "\u3053\u306E\u63A5\u7D9A\u3067\u306F\u958B\u59CB\u64CD\u4F5C\u3092\u884C\u3048\u307E\u305B\u3093\u3002"), !ownReady && /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u307E\u305A\u81EA\u5206\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"), /*#__PURE__*/React.createElement("button", {
+    className: "dangerButton",
+    onClick: onDissolveRoom,
+    disabled: !canParentControl
+  }, "\u90E8\u5C4B\u3092\u89E3\u6563"))), /*#__PURE__*/React.createElement("section", {
     className: "players lobbyPlayers"
   }, state.players.map(function (player) {
     return /*#__PURE__*/React.createElement("article", {
@@ -2335,7 +2384,15 @@ function LobbyScreen(_ref32) {
       className: "badge cpuBadge"
     }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
       className: "badge readyBadge"
-    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, "\u5E2D ", player.id + 1)), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"));
+    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, "\u5E2D ", player.id + 1)), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"), canParentControl && !isParentPlayer(player.id) && !player.isCpu && /*#__PURE__*/React.createElement("button", {
+      className: "cpuToggle dangerButton",
+      onClick: function onClick() {
+        return onEvent({
+          type: "kickPlayer",
+          targetId: player.id
+        });
+      }
+    }, "kick"));
   })));
 }
 function Board(_ref33) {
@@ -2577,11 +2634,13 @@ function App() {
     _useState26 = _slicedToArray(_useState25, 2),
     copyStatus = _useState26[0],
     setCopyStatus = _useState26[1];
+  var lastKickedAt = useRef(null);
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
     join = _usePeerRoom.join,
-    send = _usePeerRoom.send;
+    send = _usePeerRoom.send,
+    closeNetwork = _usePeerRoom.closeNetwork;
   function act(event) {
     var owned = _objectSpread(_objectSpread({}, event), {}, {
       playerId: myPlayerId
@@ -2594,6 +2653,23 @@ function App() {
   useEffect(function () {
     if (state.orderLocked && screen === "lobby") setScreen("game");
   }, [state.orderLocked, screen]);
+  useEffect(function () {
+    if (!state.roomClosedAt) return;
+    closeNetwork();
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+  }, [state.roomClosedAt]);
+  useEffect(function () {
+    var _state$players$myPlay;
+    var kickedAt = (_state$players$myPlay = state.players[myPlayerId]) === null || _state$players$myPlay === void 0 ? void 0 : _state$players$myPlay.kickedAt;
+    if (!kickedAt || kickedAt === lastKickedAt.current || isParentPlayer(myPlayerId)) return;
+    lastKickedAt.current = kickedAt;
+    closeNetwork();
+    setScreen("home");
+    setState(createGame(crypto.randomUUID().slice(0, 8)));
+    history.replaceState(null, "", location.pathname);
+  }, [state.players, myPlayerId]);
   useEffect(function () {
     if (net.mode === "guest") return;
     var event = nextCpuEvent(state);
@@ -2654,13 +2730,14 @@ function App() {
     setScreen("lobby");
   }
   function startHumanGame() {
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
     act({
       type: "randomizeOrder"
     });
     setScreen("game");
   }
   function startCpuGame() {
-    if (net.mode === "guest") return;
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
     setState(function (prev) {
       var filled = reducer(prev, {
         type: "fillCpu",
@@ -2672,6 +2749,12 @@ function App() {
       });
     });
     setScreen("game");
+  }
+  function dissolveRoom() {
+    if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
+    act({
+      type: "dissolveRoom"
+    });
   }
   if (screen === "home") {
     return /*#__PURE__*/React.createElement(HomeScreen, {
@@ -2695,7 +2778,8 @@ function App() {
       },
       copyStatus: copyStatus,
       onStartHuman: startHumanGame,
-      onStartCpu: startCpuGame
+      onStartCpu: startCpuGame,
+      onDissolveRoom: dissolveRoom
     });
   }
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {

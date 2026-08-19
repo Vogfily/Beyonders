@@ -301,6 +301,16 @@ h2 {
   background: #a7f3d0;
 }
 
+.dangerButton {
+  border-color: rgba(248, 113, 113, 0.38);
+  color: #ffe4e6;
+  background: rgba(127, 29, 29, 0.35);
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.45);
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
