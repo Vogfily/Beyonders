@@ -781,6 +781,17 @@ h2 {
   box-shadow: 0 0 0 2px rgba(255, 243, 168, 0.55) inset;
 }
 
+.lobbyPlayers article.emptySeat {
+  opacity: 0.42;
+  filter: saturate(0.45);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.lobbyPlayers article.emptySeat.active {
+  opacity: 0.72;
+  filter: saturate(0.7);
+}
+
 .players div {
   display: flex;
   justify-content: space-between;

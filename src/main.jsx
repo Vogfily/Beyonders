@@ -1896,8 +1896,10 @@ function LobbyScreen({
       </section>
 
       <section className="players lobbyPlayers">
-        {state.players.map((player) => (
-          <article key={player.id} style={{ "--player": player.color }} className={player.id === myPlayerId ? "active" : ""}>
+        {state.players.map((player) => {
+          const isEmptySeat = !isParentPlayer(player.id) && !player.isCpu && !isReadyHuman(player);
+          return (
+          <article key={player.id} style={{ "--player": player.color }} className={`${player.id === myPlayerId ? "active" : ""} ${isEmptySeat ? "emptySeat" : ""}`}>
             <div>
               <strong>
                 {player.name}
@@ -1913,7 +1915,8 @@ function LobbyScreen({
               </button>
             )}
           </article>
-        ))}
+          );
+        })}
       </section>
     </main>
   );

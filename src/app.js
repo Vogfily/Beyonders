@@ -2374,12 +2374,13 @@ function LobbyScreen(_ref32) {
   }, "\u90E8\u5C4B\u3092\u89E3\u6563"))), /*#__PURE__*/React.createElement("section", {
     className: "players lobbyPlayers"
   }, state.players.map(function (player) {
+    var isEmptySeat = !isParentPlayer(player.id) && !player.isCpu && !isReadyHuman(player);
     return /*#__PURE__*/React.createElement("article", {
       key: player.id,
       style: {
         "--player": player.color
       },
-      className: player.id === myPlayerId ? "active" : ""
+      className: "".concat(player.id === myPlayerId ? "active" : "", " ").concat(isEmptySeat ? "emptySeat" : "")
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
       className: "badge cpuBadge"
     }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
