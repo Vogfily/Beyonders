@@ -1783,7 +1783,7 @@ function HomeScreen({ net, onCreate, onJoin, alert }) {
           <input
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
-            placeholder="募集リンクまたはRoom ID"
+            placeholder="room IDを入力"
           />
           <button className="homeButton" onClick={() => onJoin(joinInput)} disabled={!canJoin || !window.Peer}>
             <Orbit size={18} /> 部屋に参加
@@ -2127,6 +2127,10 @@ function App() {
   }
 
   function joinRoomFromHome(input) {
+    if (input.trim() === "POPUP!") {
+      showRoomFullAlert();
+      return;
+    }
     const roomId = roomIdFromInput(input);
     if (!roomId) return;
     join(roomId);

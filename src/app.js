@@ -2277,7 +2277,7 @@ function HomeScreen(_ref34) {
     onChange: function onChange(e) {
       return setJoinInput(e.target.value);
     },
-    placeholder: "\u52DF\u96C6\u30EA\u30F3\u30AF\u307E\u305F\u306FRoom ID"
+    placeholder: "room ID\u3092\u5165\u529B"
   }), /*#__PURE__*/React.createElement("button", {
     className: "homeButton",
     onClick: function onClick() {
@@ -2749,6 +2749,10 @@ function App() {
     setScreen("lobby");
   }
   function joinRoomFromHome(input) {
+    if (input.trim() === "POPUP!") {
+      showRoomFullAlert();
+      return;
+    }
     var roomId = roomIdFromInput(input);
     if (!roomId) return;
     join(roomId);
