@@ -380,7 +380,6 @@ function createGame(roomId = crypto.randomUUID().slice(0, 8)) {
     board,
     players: PLAYERS.map((player) => ({
       ...player,
-      discord: "",
       isCpu: false,
       resources: emptyResources(),
       hiddenNewFrontiers: [],
@@ -497,10 +496,7 @@ function phaseLabel(state) {
 
 function discordInviteText(state, shareUrl) {
   const mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
-  const players = state.players.map((player) => {
-    const discord = player.discord ? ` Discord:${player.discord}` : "";
-    return `${player.name}${player.isCpu ? " CPU" : ""}${discord}`;
-  }).join(" / ");
+  const players = state.players.map((player) => `${player.name}${player.isCpu ? " CPU" : ""}`).join(" / ");
   const order = state.orderLocked
     ? (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ")
     : "これから決定";
@@ -527,7 +523,15 @@ function discordRulesText() {
 }
 
 function isUnclaimedPlayerSeat(player, actorId) {
-  return player.id !== actorId && !player.isCpu && !player.discord && player.name === PLAYERS[player.id]?.name;
+  return player.id !== actorId && !player.isCpu && player.name === PLAYERS[player.id]?.name;
+}
+
+function isReadyHuman(player) {
+  return !player.isCpu && player.name.trim() && player.name !== PLAYERS[player.id]?.name;
+}
+
+function readyHumanCount(state) {
+  return state.players.filter(isReadyHuman).length;
 }
 
 function isMainPhase(state) {
@@ -952,10 +956,6 @@ function reducer(state, event) {
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || `Player ${actor + 1}`;
-    return next;
-  }
-  if (event.type === "setDiscord") {
-    next.players[actor].discord = event.discord.replace(/\s+/g, " ").trim().slice(0, 32);
     return next;
   }
   if (event.type === "setCpu") {
@@ -1763,6 +1763,118 @@ function HomeScreen({ net, onCreate, onJoin }) {
   );
 }
 
+function LobbyScreen({
+  state,
+  myPlayerId,
+  setMyPlayerId,
+  net,
+  onEvent,
+  onCopyInvite,
+  onCopyRules,
+  copyStatus,
+  onStartHuman,
+  onStartCpu,
+}) {
+  const readyCount = readyHumanCount(state);
+  const ownReady = isReadyHuman(state.players[myPlayerId]);
+  const canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  const canStartHuman = canHostStart && readyCount === 4;
+  const canStartCpu = canHostStart && ownReady && readyCount < 4;
+  return (
+    <main className="lobbyMain">
+      <section className="topbar">
+        <div>
+          <h1>Beyonders</h1>
+          <p>待機中。席を選び、プレイヤー名を入力してから開始します。</p>
+        </div>
+        <div className="net">
+          <span>{net.status}</span>
+          <button onClick={onCopyInvite} disabled={!net.share} title="共有リンクつきの募集文をコピー">
+            <Copy size={17} /> 募集文
+          </button>
+          <button onClick={onCopyRules} title="Discordに固定するルール案内をコピー">
+            <Copy size={17} /> ルール文
+          </button>
+          {copyStatus && <span className="copyStatus">{copyStatus}</span>}
+        </div>
+      </section>
+
+      <section className="lobbyGrid">
+        <article className="lobbyPanel">
+          <h2>あなたの席</h2>
+          <label>
+            席
+            <select value={myPlayerId} onChange={(e) => setMyPlayerId(Number(e.target.value))}>
+              {state.players.filter((player) => !player.isCpu || player.id === myPlayerId).map((player) => (
+                <option key={player.id} value={player.id}>{player.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            プレイヤー名
+            <input
+              value={state.players[myPlayerId].name}
+              onChange={(e) => onEvent({ type: "rename", name: e.target.value })}
+              disabled={state.players[myPlayerId].isCpu}
+              placeholder="名前を入力"
+            />
+          </label>
+        </article>
+
+        <article className="lobbyPanel">
+          <h2>ゲーム設定</h2>
+          <div className="modeChooser" aria-label="ゲームモード">
+            <button
+              className={state.gameMode === "normal" ? "selected" : ""}
+              onClick={() => onEvent({ type: "setGameMode", gameMode: "normal" })}
+              disabled={!canHostStart}
+              title="数字の並び順を固定した標準盤面"
+            >
+              ノーマル
+            </button>
+            <button
+              className={state.gameMode === "hard" ? "selected" : ""}
+              onClick={() => onEvent({ type: "setGameMode", gameMode: "hard" })}
+              disabled={!canHostStart}
+              title="地形と数字をすべてランダムにした盤面"
+            >
+              ハード
+            </button>
+          </div>
+          <p className="spaceportNote">入力済みプレイヤー: {readyCount} / 4</p>
+          {readyCount === 4 ? (
+            <button className="primary" onClick={onStartHuman} disabled={!canStartHuman}>
+              <Shuffle size={18} /> ゲーム開始
+            </button>
+          ) : (
+            <button className="primary" onClick={onStartCpu} disabled={!canStartCpu}>
+              <Orbit size={18} /> CPUを入れて開始
+            </button>
+          )}
+          {net.mode === "guest" && <p className="spaceportNote">開始操作はホストが行います。</p>}
+          {!ownReady && <p className="spaceportNote">まず自分のプレイヤー名を入力してください。</p>}
+        </article>
+      </section>
+
+      <section className="players lobbyPlayers">
+        {state.players.map((player) => (
+          <article key={player.id} style={{ "--player": player.color }} className={player.id === myPlayerId ? "active" : ""}>
+            <div>
+              <strong>
+                {player.name}
+                {player.isCpu && <span className="badge cpuBadge">CPU</span>}
+                {isReadyHuman(player) && <span className="badge readyBadge">準備OK</span>}
+              </strong>
+              <span>席 {player.id + 1}</span>
+            </div>
+            <p>{player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"}</p>
+          </article>
+        ))}
+      </section>
+    </main>
+  );
+}
+
 function Board({ state, onEvent, myPlayerId }) {
   const active = currentPlayer(state).id;
   const canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
@@ -1889,7 +2001,7 @@ function App() {
   const startsInRoom = useMemo(() => Boolean(initialParams.get("join") || initialParams.get("host")), [initialParams]);
   const [state, setState] = useState(() => createGame(initialRoom));
   const [myPlayerId, setMyPlayerId] = useState(() => Number(initialParams.get("p") || 0));
-  const [screen, setScreen] = useState(() => startsInRoom ? "game" : "home");
+  const [screen, setScreen] = useState(() => startsInRoom ? "lobby" : "home");
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
   const [copyStatus, setCopyStatus] = useState("");
@@ -1900,6 +2012,10 @@ function App() {
     if (send(owned)) return;
     setState((prev) => reducer(prev, owned));
   }
+
+  useEffect(() => {
+    if (state.orderLocked && screen === "lobby") setScreen("game");
+  }, [state.orderLocked, screen]);
 
   useEffect(() => {
     if (net.mode === "guest") return;
@@ -1943,7 +2059,7 @@ function App() {
   function createRoomFromHome() {
     host();
     setMyPlayerId(0);
-    setScreen("game");
+    setScreen("lobby");
   }
 
   function joinRoomFromHome(input) {
@@ -1952,11 +2068,42 @@ function App() {
     const playerId = playerIdFromInput(input, 1);
     setMyPlayerId(playerId);
     join(roomId, playerId);
+    setScreen("lobby");
+  }
+
+  function startHumanGame() {
+    act({ type: "randomizeOrder" });
+    setScreen("game");
+  }
+
+  function startCpuGame() {
+    if (net.mode === "guest") return;
+    setState((prev) => {
+      const filled = reducer(prev, { type: "fillCpu", playerId: myPlayerId });
+      return reducer(filled, { type: "randomizeOrder", playerId: myPlayerId });
+    });
     setScreen("game");
   }
 
   if (screen === "home") {
     return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} />;
+  }
+
+  if (screen === "lobby" && !state.orderLocked) {
+    return (
+      <LobbyScreen
+        state={state}
+        myPlayerId={myPlayerId}
+        setMyPlayerId={setMyPlayerId}
+        net={net}
+        onEvent={act}
+        onCopyInvite={() => copyToClipboard(discordInviteText(state, shareUrl), "募集文")}
+        onCopyRules={() => copyToClipboard(discordRulesText(), "ルール案内")}
+        copyStatus={copyStatus}
+        onStartHuman={startHumanGame}
+        onStartCpu={startCpuGame}
+      />
+    );
   }
 
   return (
@@ -2007,17 +2154,8 @@ function App() {
               </strong>
               <span>{getVp(state, player.id)} VP</span>
             </div>
-            {player.discord && <p className="discordTag">Discord: {player.discord}</p>}
             <p>{visibleResourceText(player, myPlayerId)}</p>
             <small>TVA {player.playedTv} / 未知への旅 {player.hiddenNewFrontiers.length}枚 / 公開済み: {publicPlayedFrontiers(player)} / {spaceportText(state, player.id)}</small>
-            <button
-              className="cpuToggle"
-              onClick={() => act({ type: "setCpu", targetId: player.id, isCpu: !player.isCpu })}
-              disabled={player.id === myPlayerId || net.mode === "guest" || state.orderLocked}
-              title={state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
-            >
-              {player.isCpu ? "CPU解除" : "CPUにする"}
-            </button>
           </article>
         ))}
       </section>
@@ -2047,52 +2185,11 @@ function App() {
                 ))}
               </select>
             </label>
-            <label>
-              プレイヤー名
-              <input value={me.name} onChange={(e) => act({ type: "rename", name: e.target.value })} disabled={me.isCpu} />
-            </label>
-            <label>
-              Discord名
-              <input
-                value={me.discord || ""}
-                onChange={(e) => act({ type: "setDiscord", discord: e.target.value })}
-                placeholder="例: yourname / @yourname"
-                disabled={me.isCpu}
-              />
-            </label>
           </div>
 
           <ResourceHand player={me} />
 
           <div className="actions">
-            <div className="modeChooser" aria-label="ゲームモード">
-              <button
-                className={state.gameMode === "normal" ? "selected" : ""}
-                onClick={() => act({ type: "setGameMode", gameMode: "normal" })}
-                disabled={state.phase !== "setup" || state.orderLocked}
-                title="数字の並び順を固定した標準盤面"
-              >
-                ノーマル
-              </button>
-              <button
-                className={state.gameMode === "hard" ? "selected" : ""}
-                onClick={() => act({ type: "setGameMode", gameMode: "hard" })}
-                disabled={state.phase !== "setup" || state.orderLocked}
-                title="地形と数字をすべてランダムにした盤面"
-              >
-                ハード
-              </button>
-            </div>
-            <button
-              onClick={() => act({ type: "fillCpu" })}
-              disabled={state.phase !== "setup" || state.orderLocked || net.mode === "guest"}
-              title="名前やDiscord名が未設定の席をCPUにします"
-            >
-              <Orbit size={18} /> 空き枠をCPU補完
-            </button>
-            <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>
-              <Shuffle size={18} /> 順番決定して開始
-            </button>
             <button className="primary" onClick={() => act({ type: "roll" })} disabled={!actionable || state.phase !== "play" || state.rolled}>
               <Dice5 size={18} /> サイコロ
             </button>

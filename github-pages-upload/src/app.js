@@ -514,7 +514,6 @@ function createGame() {
     board: board,
     players: PLAYERS.map(function (player) {
       return _objectSpread(_objectSpread({}, player), {}, {
-        discord: "",
         isCpu: false,
         resources: emptyResources(),
         hiddenNewFrontiers: [],
@@ -646,8 +645,7 @@ function phaseLabel(state) {
 function discordInviteText(state, shareUrl) {
   var mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
   var players = state.players.map(function (player) {
-    var discord = player.discord ? " Discord:".concat(player.discord) : "";
-    return "".concat(player.name).concat(player.isCpu ? " CPU" : "").concat(discord);
+    return "".concat(player.name).concat(player.isCpu ? " CPU" : "");
   }).join(" / ");
   var order = state.orderLocked ? (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
     return state.players[id].name;
@@ -659,7 +657,14 @@ function discordRulesText() {
 }
 function isUnclaimedPlayerSeat(player, actorId) {
   var _PLAYERS$player$id;
-  return player.id !== actorId && !player.isCpu && !player.discord && player.name === ((_PLAYERS$player$id = PLAYERS[player.id]) === null || _PLAYERS$player$id === void 0 ? void 0 : _PLAYERS$player$id.name);
+  return player.id !== actorId && !player.isCpu && player.name === ((_PLAYERS$player$id = PLAYERS[player.id]) === null || _PLAYERS$player$id === void 0 ? void 0 : _PLAYERS$player$id.name);
+}
+function isReadyHuman(player) {
+  var _PLAYERS$player$id2;
+  return !player.isCpu && player.name.trim() && player.name !== ((_PLAYERS$player$id2 = PLAYERS[player.id]) === null || _PLAYERS$player$id2 === void 0 ? void 0 : _PLAYERS$player$id2.name);
+}
+function readyHumanCount(state) {
+  return state.players.filter(isReadyHuman).length;
 }
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
@@ -1333,10 +1338,6 @@ function reducer(state, event) {
   if (event.type === "reset") return createGame(event.roomId || crypto.randomUUID().slice(0, 8));
   if (event.type === "rename") {
     next.players[actor].name = event.name.slice(0, 18) || "Player ".concat(actor + 1);
-    return next;
-  }
-  if (event.type === "setDiscord") {
-    next.players[actor].discord = event.discord.replace(/\s+/g, " ").trim().slice(0, 32);
     return next;
   }
   if (event.type === "setCpu") {
@@ -2217,10 +2218,130 @@ function HomeScreen(_ref31) {
     className: "homeNote"
   }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
 }
-function Board(_ref32) {
+function LobbyScreen(_ref32) {
   var state = _ref32.state,
+    myPlayerId = _ref32.myPlayerId,
+    setMyPlayerId = _ref32.setMyPlayerId,
+    net = _ref32.net,
     onEvent = _ref32.onEvent,
-    myPlayerId = _ref32.myPlayerId;
+    onCopyInvite = _ref32.onCopyInvite,
+    onCopyRules = _ref32.onCopyRules,
+    copyStatus = _ref32.copyStatus,
+    onStartHuman = _ref32.onStartHuman,
+    onStartCpu = _ref32.onStartCpu;
+  var readyCount = readyHumanCount(state);
+  var ownReady = isReadyHuman(state.players[myPlayerId]);
+  var canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  var canStartHuman = canHostStart && readyCount === 4;
+  var canStartCpu = canHostStart && ownReady && readyCount < 4;
+  return /*#__PURE__*/React.createElement("main", {
+    className: "lobbyMain"
+  }, /*#__PURE__*/React.createElement("section", {
+    className: "topbar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5F85\u6A5F\u4E2D\u3002\u5E2D\u3092\u9078\u3073\u3001\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304B\u3089\u958B\u59CB\u3057\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", {
+    className: "net"
+  }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("button", {
+    onClick: onCopyInvite,
+    disabled: !net.share,
+    title: "\u5171\u6709\u30EA\u30F3\u30AF\u3064\u304D\u306E\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCopyRules,
+    title: "Discord\u306B\u56FA\u5B9A\u3059\u308B\u30EB\u30FC\u30EB\u6848\u5185\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u30EB\u30FC\u30EB\u6587"), copyStatus && /*#__PURE__*/React.createElement("span", {
+    className: "copyStatus"
+  }, copyStatus))), /*#__PURE__*/React.createElement("section", {
+    className: "lobbyGrid"
+  }, /*#__PURE__*/React.createElement("article", {
+    className: "lobbyPanel"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u3042\u306A\u305F\u306E\u5E2D"), /*#__PURE__*/React.createElement("label", null, "\u5E2D", /*#__PURE__*/React.createElement("select", {
+    value: myPlayerId,
+    onChange: function onChange(e) {
+      return setMyPlayerId(Number(e.target.value));
+    }
+  }, state.players.filter(function (player) {
+    return !player.isCpu || player.id === myPlayerId;
+  }).map(function (player) {
+    return /*#__PURE__*/React.createElement("option", {
+      key: player.id,
+      value: player.id
+    }, player.name);
+  }))), /*#__PURE__*/React.createElement("label", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D", /*#__PURE__*/React.createElement("input", {
+    value: state.players[myPlayerId].name,
+    onChange: function onChange(e) {
+      return onEvent({
+        type: "rename",
+        name: e.target.value
+      });
+    },
+    disabled: state.players[myPlayerId].isCpu,
+    placeholder: "\u540D\u524D\u3092\u5165\u529B"
+  }))), /*#__PURE__*/React.createElement("article", {
+    className: "lobbyPanel"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u30B2\u30FC\u30E0\u8A2D\u5B9A"), /*#__PURE__*/React.createElement("div", {
+    className: "modeChooser",
+    "aria-label": "\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "normal" ? "selected" : "",
+    onClick: function onClick() {
+      return onEvent({
+        type: "setGameMode",
+        gameMode: "normal"
+      });
+    },
+    disabled: !canHostStart,
+    title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
+  }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "hard" ? "selected" : "",
+    onClick: function onClick() {
+      return onEvent({
+        type: "setGameMode",
+        gameMode: "hard"
+      });
+    },
+    disabled: !canHostStart,
+    title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
+  }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u5165\u529B\u6E08\u307F\u30D7\u30EC\u30A4\u30E4\u30FC: ", readyCount, " / 4"), readyCount === 4 ? /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onStartHuman,
+    disabled: !canStartHuman
+  }, /*#__PURE__*/React.createElement(Shuffle, {
+    size: 18
+  }), " \u30B2\u30FC\u30E0\u958B\u59CB") : /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onStartCpu,
+    disabled: !canStartCpu
+  }, /*#__PURE__*/React.createElement(Orbit, {
+    size: 18
+  }), " CPU\u3092\u5165\u308C\u3066\u958B\u59CB"), net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u958B\u59CB\u64CD\u4F5C\u306F\u30DB\u30B9\u30C8\u304C\u884C\u3044\u307E\u3059\u3002"), !ownReady && /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u307E\u305A\u81EA\u5206\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"))), /*#__PURE__*/React.createElement("section", {
+    className: "players lobbyPlayers"
+  }, state.players.map(function (player) {
+    return /*#__PURE__*/React.createElement("article", {
+      key: player.id,
+      style: {
+        "--player": player.color
+      },
+      className: player.id === myPlayerId ? "active" : ""
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
+      className: "badge cpuBadge"
+    }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
+      className: "badge readyBadge"
+    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, "\u5E2D ", player.id + 1)), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"));
+  })));
+}
+function Board(_ref33) {
+  var state = _ref33.state,
+    onEvent = _ref33.onEvent,
+    myPlayerId = _ref33.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2432,7 +2553,7 @@ function App() {
     myPlayerId = _useState18[0],
     setMyPlayerId = _useState18[1];
   var _useState19 = useState(function () {
-      return startsInRoom ? "game" : "home";
+      return startsInRoom ? "lobby" : "home";
     }),
     _useState20 = _slicedToArray(_useState19, 2),
     screen = _useState20[0],
@@ -2470,6 +2591,9 @@ function App() {
       return reducer(prev, owned);
     });
   }
+  useEffect(function () {
+    if (state.orderLocked && screen === "lobby") setScreen("game");
+  }, [state.orderLocked, screen]);
   useEffect(function () {
     if (net.mode === "guest") return;
     var event = nextCpuEvent(state);
@@ -2519,7 +2643,7 @@ function App() {
   function createRoomFromHome() {
     host();
     setMyPlayerId(0);
-    setScreen("game");
+    setScreen("lobby");
   }
   function joinRoomFromHome(input) {
     var roomId = roomIdFromInput(input);
@@ -2527,6 +2651,26 @@ function App() {
     var playerId = playerIdFromInput(input, 1);
     setMyPlayerId(playerId);
     join(roomId, playerId);
+    setScreen("lobby");
+  }
+  function startHumanGame() {
+    act({
+      type: "randomizeOrder"
+    });
+    setScreen("game");
+  }
+  function startCpuGame() {
+    if (net.mode === "guest") return;
+    setState(function (prev) {
+      var filled = reducer(prev, {
+        type: "fillCpu",
+        playerId: myPlayerId
+      });
+      return reducer(filled, {
+        type: "randomizeOrder",
+        playerId: myPlayerId
+      });
+    });
     setScreen("game");
   }
   if (screen === "home") {
@@ -2534,6 +2678,24 @@ function App() {
       net: net,
       onCreate: createRoomFromHome,
       onJoin: joinRoomFromHome
+    });
+  }
+  if (screen === "lobby" && !state.orderLocked) {
+    return /*#__PURE__*/React.createElement(LobbyScreen, {
+      state: state,
+      myPlayerId: myPlayerId,
+      setMyPlayerId: setMyPlayerId,
+      net: net,
+      onEvent: act,
+      onCopyInvite: function onCopyInvite() {
+        return copyToClipboard(discordInviteText(state, shareUrl), "募集文");
+      },
+      onCopyRules: function onCopyRules() {
+        return copyToClipboard(discordRulesText(), "ルール案内");
+      },
+      copyStatus: copyStatus,
+      onStartHuman: startHumanGame,
+      onStartCpu: startCpuGame
     });
   }
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
@@ -2585,20 +2747,7 @@ function App() {
       className: "badge"
     }, "\u6700\u9577\u9818\u754C\u8DEF"), player.bonus.largestTv && /*#__PURE__*/React.createElement("span", {
       className: "badge"
-    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), player.discord && /*#__PURE__*/React.createElement("p", {
-      className: "discordTag"
-    }, "Discord: ", player.discord), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
-      className: "cpuToggle",
-      onClick: function onClick() {
-        return act({
-          type: "setCpu",
-          targetId: player.id,
-          isCpu: !player.isCpu
-        });
-      },
-      disabled: player.id === myPlayerId || net.mode === "guest" || state.orderLocked,
-      title: state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
-    }, player.isCpu ? "CPU解除" : "CPUにする"));
+    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)));
   })), /*#__PURE__*/React.createElement("section", {
     className: "layout"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2635,73 +2784,11 @@ function App() {
       key: p.id,
       value: p.id
     }, p.name, p.isCpu ? " CPU" : "");
-  }))), /*#__PURE__*/React.createElement("label", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D", /*#__PURE__*/React.createElement("input", {
-    value: me.name,
-    onChange: function onChange(e) {
-      return act({
-        type: "rename",
-        name: e.target.value
-      });
-    },
-    disabled: me.isCpu
-  })), /*#__PURE__*/React.createElement("label", null, "Discord\u540D", /*#__PURE__*/React.createElement("input", {
-    value: me.discord || "",
-    onChange: function onChange(e) {
-      return act({
-        type: "setDiscord",
-        discord: e.target.value
-      });
-    },
-    placeholder: "\u4F8B: yourname / @yourname",
-    disabled: me.isCpu
-  }))), /*#__PURE__*/React.createElement(ResourceHand, {
+  })))), /*#__PURE__*/React.createElement(ResourceHand, {
     player: me
   }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modeChooser",
-    "aria-label": "\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9"
   }, /*#__PURE__*/React.createElement("button", {
-    className: state.gameMode === "normal" ? "selected" : "",
-    onClick: function onClick() {
-      return act({
-        type: "setGameMode",
-        gameMode: "normal"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked,
-    title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
-  }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
-    className: state.gameMode === "hard" ? "selected" : "",
-    onClick: function onClick() {
-      return act({
-        type: "setGameMode",
-        gameMode: "hard"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked,
-    title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
-  }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("button", {
-    onClick: function onClick() {
-      return act({
-        type: "fillCpu"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked || net.mode === "guest",
-    title: "\u540D\u524D\u3084Discord\u540D\u304C\u672A\u8A2D\u5B9A\u306E\u5E2D\u3092CPU\u306B\u3057\u307E\u3059"
-  }, /*#__PURE__*/React.createElement(Orbit, {
-    size: 18
-  }), " \u7A7A\u304D\u67A0\u3092CPU\u88DC\u5B8C"), /*#__PURE__*/React.createElement("button", {
-    className: "primary",
-    onClick: function onClick() {
-      return act({
-        type: "randomizeOrder"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked || state.setupStep > 0
-  }, /*#__PURE__*/React.createElement(Shuffle, {
-    size: 18
-  }), " \u9806\u756A\u6C7A\u5B9A\u3057\u3066\u958B\u59CB"), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     onClick: function onClick() {
       return act({

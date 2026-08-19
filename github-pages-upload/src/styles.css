@@ -221,6 +221,42 @@ h2 {
   font-size: 13px;
 }
 
+.lobbyMain {
+  display: grid;
+  gap: 16px;
+}
+
+.lobbyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.lobbyPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 18, 32, 0.82);
+}
+
+.lobbyPanel label {
+  display: grid;
+  gap: 5px;
+  color: #b9c6da;
+  font-size: 12px;
+}
+
+.lobbyPlayers {
+  margin-top: 0;
+}
+
+.readyBadge {
+  background: #a7f3d0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
@@ -725,18 +761,6 @@ h2 {
   font-size: 12px;
 }
 
-.players .discordTag {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
-  padding: 3px 7px;
-  border: 1px solid rgba(191, 231, 255, 0.35);
-  border-radius: 999px;
-  color: #dce7ff;
-  background: rgba(88, 101, 242, 0.18);
-  font-weight: 800;
-}
-
 .players small {
   display: block;
   margin-top: 6px;
@@ -805,6 +829,10 @@ h2 {
   }
 
   .homeActions {
+    grid-template-columns: 1fr;
+  }
+
+  .lobbyGrid {
     grid-template-columns: 1fr;
   }
 
