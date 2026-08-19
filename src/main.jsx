@@ -494,6 +494,46 @@ function phaseLabel(state) {
   return "メインフェーズ";
 }
 
+function discordInviteText(state, shareUrl) {
+  const mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
+  const players = state.players.map((player) => `${player.name}${player.isCpu ? " CPU" : ""}`).join(" / ");
+  const order = state.orderLocked
+    ? (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ")
+    : "これから決定";
+  return [
+    "Beyondersの卓を立てました。",
+    `参加リンク: ${shareUrl}`,
+    `モード: ${mode}`,
+    `参加枠: ${players}`,
+    `順番: ${order}`,
+    "Discordのボイスチャンネルで交渉しながら遊びましょう。"
+  ].join("\n");
+}
+
+function discordRulesText() {
+  return [
+    "Beyonders かんたん案内",
+    "目的: 10VPを先に取ったプレイヤーの勝利。",
+    "流れ: サイコロ → 資源獲得 → メインフェーズ。",
+    "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。",
+    "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。",
+    "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。",
+    "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"
+  ].join("\n");
+}
+
+function isUnclaimedPlayerSeat(player, actorId) {
+  return player.id !== actorId && !player.isCpu && player.name === PLAYERS[player.id]?.name;
+}
+
+function isReadyHuman(player) {
+  return !player.isCpu && player.name.trim() && player.name !== PLAYERS[player.id]?.name;
+}
+
+function readyHumanCount(state) {
+  return state.players.filter(isReadyHuman).length;
+}
+
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -931,6 +971,18 @@ function reducer(state, event) {
       target.name = target.name.startsWith("CPU") ? `Player ${targetId + 1}` : target.name;
       addLog(next, `${target.name} がプレイヤー枠に戻りました。`);
     }
+    return next;
+  }
+  if (event.type === "fillCpu") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
+    const filled = [];
+    next.players.forEach((target) => {
+      if (!isUnclaimedPlayerSeat(target, actor)) return;
+      target.isCpu = true;
+      target.name = `CPU ${String.fromCharCode(65 + target.id)}`;
+      filled.push(target.name);
+    });
+    addLog(next, filled.length ? `空き枠をCPUで補完しました: ${filled.join(" / ")}` : "CPUで補完できる空き枠はありません。");
     return next;
   }
   if (event.type === "setGameMode") {
@@ -1518,7 +1570,7 @@ function HelpPanel() {
             <li>出目と同じ数字のタイルに隣接する小都市は資源1、大都市は資源2を得ます。</li>
             <li>7が出たらラヴェジャーズを移動し、そのタイルは産出しません。</li>
             <li>次元門に接する小都市か大都市があると、2:1または3:1交易が使えます。</li>
-            <li>人数が足りない時はプレイヤーカードからCPUに切り替えられます。CPUは交渉に参加しません。</li>
+            <li>人数が足りない時は「空き枠をCPU補完」で未設定の席をまとめてCPUにできます。CPUは交渉に参加しません。</li>
           </ul>
           <h2>勝利点</h2>
           <p>小都市は1 VP、大都市は2 VP、勝利記録は1 VPです。最長領界路と最大TVA力はそれぞれ2 VPです。</p>
@@ -1598,11 +1650,12 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     });
   }
 
-  function join(hostId) {
+  function join(hostId, playerId = myPlayerId) {
     if (!window.Peer || !hostId) return;
     const peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", () => {
+      history.replaceState(null, "", `#join=${hostId}&p=${playerId}`);
       const conn = peer.connect(hostId);
       connections.current = [conn];
       conn.on("open", () => setNet({ mode: "guest", status: "参加中", share: location.href }));
@@ -1638,7 +1691,188 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     }
   }, []);
 
-  return { net, host, send };
+  return { net, host, join, send };
+}
+
+function roomIdFromInput(input) {
+  const value = input.trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    const params = new URLSearchParams(url.hash.replace("#", ""));
+    return params.get("join") || params.get("host") || value;
+  } catch {
+    const params = new URLSearchParams(value.replace(/^#/, ""));
+    return params.get("join") || params.get("host") || value;
+  }
+}
+
+function playerIdFromInput(input, fallback = 1) {
+  const value = input.trim();
+  if (!value) return fallback;
+  try {
+    const url = new URL(value);
+    const id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  } catch {
+    const id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  }
+}
+
+function HomeScreen({ net, onCreate, onJoin }) {
+  const [joinInput, setJoinInput] = useState("");
+  const canJoin = Boolean(roomIdFromInput(joinInput));
+  return (
+    <main className="homeMain">
+      <section className="homeHero">
+        <div>
+          <h1>Beyonders</h1>
+          <p>次元を開拓し、領界路を伸ばし、Discordで交渉しながら10 VPを目指すオンライン卓。</p>
+        </div>
+      </section>
+
+      <section className="homeActions">
+        <article>
+          <h2>Create a Room</h2>
+          <p>ホストとして新しい部屋を作ります。作成後に共有リンクとDiscord募集文をコピーできます。</p>
+          <button className="primary homeButton" onClick={onCreate} disabled={!window.Peer}>
+            <RadioTower size={18} /> 部屋を作成
+          </button>
+        </article>
+
+        <article>
+          <h2>Join a Room</h2>
+          <p>友人から受け取った共有リンク、または部屋IDを貼り付けて参加します。</p>
+          <input
+            value={joinInput}
+            onChange={(e) => setJoinInput(e.target.value)}
+            placeholder="共有リンクまたは部屋ID"
+          />
+          <button className="homeButton" onClick={() => onJoin(joinInput)} disabled={!canJoin || !window.Peer}>
+            <Orbit size={18} /> 部屋に参加
+          </button>
+        </article>
+      </section>
+
+      <section className="homeNote">
+        <span>{net.status}</span>
+        <p>既存の共有リンクを開いた場合は、自動で参加画面へ進みます。</p>
+      </section>
+    </main>
+  );
+}
+
+function LobbyScreen({
+  state,
+  myPlayerId,
+  setMyPlayerId,
+  net,
+  onEvent,
+  onCopyInvite,
+  onCopyRules,
+  copyStatus,
+  onStartHuman,
+  onStartCpu,
+}) {
+  const readyCount = readyHumanCount(state);
+  const ownReady = isReadyHuman(state.players[myPlayerId]);
+  const canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  const canStartHuman = canHostStart && readyCount === 4;
+  const canStartCpu = canHostStart && ownReady && readyCount < 4;
+  return (
+    <main className="lobbyMain">
+      <section className="topbar">
+        <div>
+          <h1>Beyonders</h1>
+          <p>待機中。席を選び、プレイヤー名を入力してから開始します。</p>
+        </div>
+        <div className="net">
+          <span>{net.status}</span>
+          <button onClick={onCopyInvite} disabled={!net.share} title="共有リンクつきの募集文をコピー">
+            <Copy size={17} /> 募集文
+          </button>
+          <button onClick={onCopyRules} title="Discordに固定するルール案内をコピー">
+            <Copy size={17} /> ルール文
+          </button>
+          {copyStatus && <span className="copyStatus">{copyStatus}</span>}
+        </div>
+      </section>
+
+      <section className="lobbyGrid">
+        <article className="lobbyPanel">
+          <h2>あなたの席</h2>
+          <label>
+            席
+            <select value={myPlayerId} onChange={(e) => setMyPlayerId(Number(e.target.value))}>
+              {state.players.filter((player) => !player.isCpu || player.id === myPlayerId).map((player) => (
+                <option key={player.id} value={player.id}>{player.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            プレイヤー名
+            <input
+              value={state.players[myPlayerId].name}
+              onChange={(e) => onEvent({ type: "rename", name: e.target.value })}
+              disabled={state.players[myPlayerId].isCpu}
+              placeholder="名前を入力"
+            />
+          </label>
+        </article>
+
+        <article className="lobbyPanel">
+          <h2>ゲーム設定</h2>
+          <div className="modeChooser" aria-label="ゲームモード">
+            <button
+              className={state.gameMode === "normal" ? "selected" : ""}
+              onClick={() => onEvent({ type: "setGameMode", gameMode: "normal" })}
+              disabled={!canHostStart}
+              title="数字の並び順を固定した標準盤面"
+            >
+              ノーマル
+            </button>
+            <button
+              className={state.gameMode === "hard" ? "selected" : ""}
+              onClick={() => onEvent({ type: "setGameMode", gameMode: "hard" })}
+              disabled={!canHostStart}
+              title="地形と数字をすべてランダムにした盤面"
+            >
+              ハード
+            </button>
+          </div>
+          <p className="spaceportNote">入力済みプレイヤー: {readyCount} / 4</p>
+          {readyCount === 4 ? (
+            <button className="primary" onClick={onStartHuman} disabled={!canStartHuman}>
+              <Shuffle size={18} /> ゲーム開始
+            </button>
+          ) : (
+            <button className="primary" onClick={onStartCpu} disabled={!canStartCpu}>
+              <Orbit size={18} /> CPUを入れて開始
+            </button>
+          )}
+          {net.mode === "guest" && <p className="spaceportNote">開始操作はホストが行います。</p>}
+          {!ownReady && <p className="spaceportNote">まず自分のプレイヤー名を入力してください。</p>}
+        </article>
+      </section>
+
+      <section className="players lobbyPlayers">
+        {state.players.map((player) => (
+          <article key={player.id} style={{ "--player": player.color }} className={player.id === myPlayerId ? "active" : ""}>
+            <div>
+              <strong>
+                {player.name}
+                {player.isCpu && <span className="badge cpuBadge">CPU</span>}
+                {isReadyHuman(player) && <span className="badge readyBadge">準備OK</span>}
+              </strong>
+              <span>席 {player.id + 1}</span>
+            </div>
+            <p>{player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"}</p>
+          </article>
+        ))}
+      </section>
+    </main>
+  );
 }
 
 function Board({ state, onEvent, myPlayerId }) {
@@ -1762,18 +1996,26 @@ function Board({ state, onEvent, myPlayerId }) {
 }
 
 function App() {
-  const initialRoom = useMemo(() => new URLSearchParams(location.hash.replace("#", "")).get("room") || crypto.randomUUID().slice(0, 8), []);
+  const initialParams = useMemo(() => new URLSearchParams(location.hash.replace("#", "")), []);
+  const initialRoom = useMemo(() => initialParams.get("room") || crypto.randomUUID().slice(0, 8), [initialParams]);
+  const startsInRoom = useMemo(() => Boolean(initialParams.get("join") || initialParams.get("host")), [initialParams]);
   const [state, setState] = useState(() => createGame(initialRoom));
-  const [myPlayerId, setMyPlayerId] = useState(() => Number(new URLSearchParams(location.hash.replace("#", "")).get("p") || 0));
+  const [myPlayerId, setMyPlayerId] = useState(() => Number(initialParams.get("p") || 0));
+  const [screen, setScreen] = useState(() => startsInRoom ? "lobby" : "home");
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
   const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
-  const { net, host, send } = usePeerRoom(state, setState, state.id, myPlayerId);
+  const [copyStatus, setCopyStatus] = useState("");
+  const { net, host, join, send } = usePeerRoom(state, setState, state.id, myPlayerId);
 
   function act(event) {
     const owned = { ...event, playerId: myPlayerId };
     if (send(owned)) return;
     setState((prev) => reducer(prev, owned));
   }
+
+  useEffect(() => {
+    if (state.orderLocked && screen === "lobby") setScreen("game");
+  }, [state.orderLocked, screen]);
 
   useEffect(() => {
     if (net.mode === "guest") return;
@@ -1798,6 +2040,71 @@ function App() {
   const currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
   const selectablePlayers = state.players.filter((player) => !player.isCpu || player.id === myPlayerId);
   const turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ");
+  const shareUrl = net.share || location.href;
+
+  function copyToClipboard(text, label) {
+    if (!navigator.clipboard) {
+      setCopyStatus("コピー機能が使えません");
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyStatus(`${label}をコピーしました`);
+      window.setTimeout(() => setCopyStatus(""), 2200);
+    }).catch(() => {
+      setCopyStatus("コピーできませんでした");
+      window.setTimeout(() => setCopyStatus(""), 2200);
+    });
+  }
+
+  function createRoomFromHome() {
+    host();
+    setMyPlayerId(0);
+    setScreen("lobby");
+  }
+
+  function joinRoomFromHome(input) {
+    const roomId = roomIdFromInput(input);
+    if (!roomId) return;
+    const playerId = playerIdFromInput(input, 1);
+    setMyPlayerId(playerId);
+    join(roomId, playerId);
+    setScreen("lobby");
+  }
+
+  function startHumanGame() {
+    act({ type: "randomizeOrder" });
+    setScreen("game");
+  }
+
+  function startCpuGame() {
+    if (net.mode === "guest") return;
+    setState((prev) => {
+      const filled = reducer(prev, { type: "fillCpu", playerId: myPlayerId });
+      return reducer(filled, { type: "randomizeOrder", playerId: myPlayerId });
+    });
+    setScreen("game");
+  }
+
+  if (screen === "home") {
+    return <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} />;
+  }
+
+  if (screen === "lobby" && !state.orderLocked) {
+    return (
+      <LobbyScreen
+        state={state}
+        myPlayerId={myPlayerId}
+        setMyPlayerId={setMyPlayerId}
+        net={net}
+        onEvent={act}
+        onCopyInvite={() => copyToClipboard(discordInviteText(state, shareUrl), "募集文")}
+        onCopyRules={() => copyToClipboard(discordRulesText(), "ルール案内")}
+        copyStatus={copyStatus}
+        onStartHuman={startHumanGame}
+        onStartCpu={startCpuGame}
+      />
+    );
+  }
 
   return (
     <main>
@@ -1812,12 +2119,26 @@ function App() {
             <RadioTower size={17} /> 部屋作成
           </button>
           <button
-            onClick={() => net.share && navigator.clipboard?.writeText(net.share)}
+            onClick={() => copyToClipboard(net.share, "共有リンク")}
             disabled={!net.share}
             title="共有リンクをコピー"
           >
             <Copy size={17} /> 共有
           </button>
+          <button
+            onClick={() => copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文")}
+            disabled={!net.share}
+            title="Discordに貼る募集文をコピー"
+          >
+            <Copy size={17} /> 募集文
+          </button>
+          <button
+            onClick={() => copyToClipboard(discordRulesText(), "ルール案内")}
+            title="Discordに固定するルール案内をコピー"
+          >
+            <Copy size={17} /> ルール文
+          </button>
+          {copyStatus && <span className="copyStatus">{copyStatus}</span>}
         </div>
       </section>
 
@@ -1835,14 +2156,6 @@ function App() {
             </div>
             <p>{visibleResourceText(player, myPlayerId)}</p>
             <small>TVA {player.playedTv} / 未知への旅 {player.hiddenNewFrontiers.length}枚 / 公開済み: {publicPlayedFrontiers(player)} / {spaceportText(state, player.id)}</small>
-            <button
-              className="cpuToggle"
-              onClick={() => act({ type: "setCpu", targetId: player.id, isCpu: !player.isCpu })}
-              disabled={player.id === myPlayerId || net.mode === "guest" || state.orderLocked}
-              title={state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"}
-            >
-              {player.isCpu ? "CPU解除" : "CPUにする"}
-            </button>
           </article>
         ))}
       </section>
@@ -1872,33 +2185,11 @@ function App() {
                 ))}
               </select>
             </label>
-            <input value={me.name} onChange={(e) => act({ type: "rename", name: e.target.value })} disabled={me.isCpu} />
           </div>
 
           <ResourceHand player={me} />
 
           <div className="actions">
-            <div className="modeChooser" aria-label="ゲームモード">
-              <button
-                className={state.gameMode === "normal" ? "selected" : ""}
-                onClick={() => act({ type: "setGameMode", gameMode: "normal" })}
-                disabled={state.phase !== "setup" || state.orderLocked}
-                title="数字の並び順を固定した標準盤面"
-              >
-                ノーマル
-              </button>
-              <button
-                className={state.gameMode === "hard" ? "selected" : ""}
-                onClick={() => act({ type: "setGameMode", gameMode: "hard" })}
-                disabled={state.phase !== "setup" || state.orderLocked}
-                title="地形と数字をすべてランダムにした盤面"
-              >
-                ハード
-              </button>
-            </div>
-            <button className="primary" onClick={() => act({ type: "randomizeOrder" })} disabled={state.phase !== "setup" || state.orderLocked || state.setupStep > 0}>
-              <Shuffle size={18} /> 順番決定して開始
-            </button>
             <button className="primary" onClick={() => act({ type: "roll" })} disabled={!actionable || state.phase !== "play" || state.rolled}>
               <Dice5 size={18} /> サイコロ
             </button>

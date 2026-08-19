@@ -642,6 +642,30 @@ function phaseLabel(state) {
   if (state.turnStage === "production") return "資源獲得";
   return "メインフェーズ";
 }
+function discordInviteText(state, shareUrl) {
+  var mode = state.gameMode === "hard" ? "ハード" : "ノーマル";
+  var players = state.players.map(function (player) {
+    return "".concat(player.name).concat(player.isCpu ? " CPU" : "");
+  }).join(" / ");
+  var order = state.orderLocked ? (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
+    return state.players[id].name;
+  }).join(" → ") : "これから決定";
+  return ["Beyondersの卓を立てました。", "\u53C2\u52A0\u30EA\u30F3\u30AF: ".concat(shareUrl), "\u30E2\u30FC\u30C9: ".concat(mode), "\u53C2\u52A0\u67A0: ".concat(players), "\u9806\u756A: ".concat(order), "Discordのボイスチャンネルで交渉しながら遊びましょう。"].join("\n");
+}
+function discordRulesText() {
+  return ["Beyonders かんたん案内", "目的: 10VPを先に取ったプレイヤーの勝利。", "流れ: サイコロ → 資源獲得 → メインフェーズ。", "メインフェーズ: 交換、交渉、建設、未知への旅の購入や使用ができます。", "交渉: ターンプレイヤーから他プレイヤー1人へ申し出ます。資源をもらうだけの交換は不可。", "ラヴェジャーズ: 7が出た時などに移動し、隣接プレイヤーから資源を1枚奪います。", "用語: 小都市=開拓地 / 大都市=都市 / 領界路=街道 / 次元門=港 / ヴォイド=砂漠 / TVA=騎士 / 未知への旅=発展カード。"].join("\n");
+}
+function isUnclaimedPlayerSeat(player, actorId) {
+  var _PLAYERS$player$id;
+  return player.id !== actorId && !player.isCpu && player.name === ((_PLAYERS$player$id = PLAYERS[player.id]) === null || _PLAYERS$player$id === void 0 ? void 0 : _PLAYERS$player$id.name);
+}
+function isReadyHuman(player) {
+  var _PLAYERS$player$id2;
+  return !player.isCpu && player.name.trim() && player.name !== ((_PLAYERS$player$id2 = PLAYERS[player.id]) === null || _PLAYERS$player$id2 === void 0 ? void 0 : _PLAYERS$player$id2.name);
+}
+function readyHumanCount(state) {
+  return state.players.filter(isReadyHuman).length;
+}
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
 }
@@ -1331,6 +1355,18 @@ function reducer(state, event) {
     }
     return next;
   }
+  if (event.type === "fillCpu") {
+    if (next.phase !== "setup" || next.orderLocked) return next;
+    var filled = [];
+    next.players.forEach(function (target) {
+      if (!isUnclaimedPlayerSeat(target, actor)) return;
+      target.isCpu = true;
+      target.name = "CPU ".concat(String.fromCharCode(65 + target.id));
+      filled.push(target.name);
+    });
+    addLog(next, filled.length ? "\u7A7A\u304D\u67A0\u3092CPU\u3067\u88DC\u5B8C\u3057\u307E\u3057\u305F: ".concat(filled.join(" / ")) : "CPUで補完できる空き枠はありません。");
+    return next;
+  }
   if (event.type === "setGameMode") {
     var _voidTile$id;
     if (next.phase !== "setup" || next.orderLocked || next.setupStep > 0 || Object.keys(next.buildings).length || Object.keys(next.routes).length) return next;
@@ -1976,7 +2012,7 @@ function HelpPanel() {
     }
   }, "\u672A\u77E5\u3078\u306E\u65C5")), tab === "rules" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3001\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30CE\u30FC\u30DE\u30EB\u306F\u5730\u5F62\u3092\u30E9\u30F3\u30C0\u30E0\u3001\u6570\u5B57\u306F\u6C7A\u3081\u3089\u308C\u305F\u9806\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002\u30CF\u30FC\u30C9\u306F\u30F4\u30A9\u30A4\u30C9\u3092\u542B\u3080\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u30D7\u30EC\u30A4\u30E4\u30FC\u30AB\u30FC\u30C9\u304B\u3089CPU\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u904A\u3073\u65B9"), /*#__PURE__*/React.createElement("p", null, "\u30B5\u30A4\u30B3\u30ED\u3067\u8CC7\u6E90\u3092\u5F97\u3066\u3001\u5C0F\u90FD\u5E02\u3001\u5927\u90FD\u5E02\u3001\u9818\u754C\u8DEF\u3092\u5E83\u3052\u307E\u3059\u300210 VP\u306B\u5230\u9054\u3057\u305F\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u52DD\u5229\u3067\u3059\u3002"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, "\u53C2\u52A0\u8005\u3068CPU\u67A0\u3001\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9\u3092\u6C7A\u3081\u3066\u304B\u3089\u3001\u9806\u756A\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3067\u30D7\u30EC\u30A4\u30E4\u30FC\u9806\u3092\u30E9\u30F3\u30C0\u30E0\u306B\u6C7A\u3081\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30CE\u30FC\u30DE\u30EB\u306F\u5730\u5F62\u3092\u30E9\u30F3\u30C0\u30E0\u3001\u6570\u5B57\u306F\u6C7A\u3081\u3089\u308C\u305F\u9806\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002\u30CF\u30FC\u30C9\u306F\u30F4\u30A9\u30A4\u30C9\u3092\u542B\u3080\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u914D\u7F6E\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u521D\u671F\u914D\u7F6E\u3067\u306F\u5404\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u5C0F\u90FD\u5E02\u3068\u9818\u754C\u8DEF\u30922\u30BB\u30C3\u30C8\u7F6E\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u81EA\u5206\u306E\u756A\u306F\u30B5\u30A4\u30B3\u30ED\u3001\u8CC7\u6E90\u7372\u5F97\u3001\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u306E\u9806\u306B\u9032\u307F\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u30E1\u30A4\u30F3\u30D5\u30A7\u30FC\u30BA\u3067\u306F\u4EA4\u63DB\u3001\u5EFA\u8A2D\u3001\u672A\u77E5\u3078\u306E\u65C5\u3001\u4EA4\u6E09\u3092\u884C\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u51FA\u76EE\u3068\u540C\u3058\u6570\u5B57\u306E\u30BF\u30A4\u30EB\u306B\u96A3\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u306F\u8CC7\u6E901\u3001\u5927\u90FD\u5E02\u306F\u8CC7\u6E902\u3092\u5F97\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "7\u304C\u51FA\u305F\u3089\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u79FB\u52D5\u3057\u3001\u305D\u306E\u30BF\u30A4\u30EB\u306F\u7523\u51FA\u3057\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("li", null, "\u6B21\u5143\u9580\u306B\u63A5\u3059\u308B\u5C0F\u90FD\u5E02\u304B\u5927\u90FD\u5E02\u304C\u3042\u308B\u3068\u30012:1\u307E\u305F\u306F3:1\u4EA4\u6613\u304C\u4F7F\u3048\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("li", null, "\u4EBA\u6570\u304C\u8DB3\u308A\u306A\u3044\u6642\u306F\u300C\u7A7A\u304D\u67A0\u3092CPU\u88DC\u5B8C\u300D\u3067\u672A\u8A2D\u5B9A\u306E\u5E2D\u3092\u307E\u3068\u3081\u3066CPU\u306B\u3067\u304D\u307E\u3059\u3002CPU\u306F\u4EA4\u6E09\u306B\u53C2\u52A0\u3057\u307E\u305B\u3093\u3002")), /*#__PURE__*/React.createElement("h2", null, "\u52DD\u5229\u70B9"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u306F1 VP\u3001\u5927\u90FD\u5E02\u306F2 VP\u3001\u52DD\u5229\u8A18\u9332\u306F1 VP\u3067\u3059\u3002\u6700\u9577\u9818\u754C\u8DEF\u3068\u6700\u5927TVA\u529B\u306F\u305D\u308C\u305E\u308C2 VP\u3067\u3059\u3002")), tab === "terms" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
   }, /*#__PURE__*/React.createElement("h2", null, "\u7528\u8A9E\u5BFE\u5FDC"), /*#__PURE__*/React.createElement("dl", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5C0F\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u57FA\u790E\u62E0\u70B9\u3002\u5EFA\u3066\u308B\u3068\u96A3\u63A5\u30BF\u30A4\u30EB\u304B\u3089\u8CC7\u6E90\u3092\u5F97\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u5927\u90FD\u5E02"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u3092\u5F37\u5316\u3057\u305F\u62E0\u70B9\u3002\u7523\u51FA\u304C2\u500D\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u9818\u754C\u8DEF"), /*#__PURE__*/React.createElement("dd", null, "\u5C0F\u90FD\u5E02\u540C\u58EB\u3092\u3064\u306A\u304E\u3001\u65B0\u3057\u3044\u5C0F\u90FD\u5E02\u3092\u7F6E\u304F\u305F\u3081\u306E\u63A5\u7D9A\u8DEF\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u6B21\u5143\u9580"), /*#__PURE__*/React.createElement("dd", null, "\u63A5\u3057\u3066\u3044\u308B\u3068\u901A\u4FE1\u4EA4\u6613\u304C\u6709\u5229\u306B\u306A\u308A\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30F4\u30A9\u30A4\u30C9"), /*#__PURE__*/React.createElement("dd", null, "\u8CC7\u6E90\u3092\u7523\u51FA\u3057\u306A\u3044\u7279\u6B8A\u30BF\u30A4\u30EB\u3067\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA"), /*#__PURE__*/React.createElement("dd", null, "\u3044\u308B\u30BF\u30A4\u30EB\u306E\u7523\u51FA\u3092\u6B62\u3081\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("dt", null, "TVA"), /*#__PURE__*/React.createElement("dd", null, "\u4F7F\u3046\u3068\u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA\u3092\u52D5\u304B\u3057\u307E\u3059\u3002"))), /*#__PURE__*/React.createElement("h2", null, "\u8CC7\u6E90"), /*#__PURE__*/React.createElement("p", null, "\u9271\u7269\u6B21\u5143=\u30EC\u30A2\u30E1\u30BF\u30EB\u3001\u6A5F\u68B0\u6B21\u5143=\u30CA\u30CE\u30DE\u30B7\u30F3\u3001\u71B1\u5E2F\u6B21\u5143=\u5EFA\u6750\u3001\u5927\u8349\u539F=\u76AE\u9769\u3001\u80A5\u6C83\u306A\u5927\u5730=\u7A40\u7269\u3002")), tab === "cards" && /*#__PURE__*/React.createElement("div", {
     className: "helpContent"
@@ -2055,10 +2091,12 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
     });
   }
   function join(hostId) {
+    var playerId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : myPlayerId;
     if (!window.Peer || !hostId) return;
     var peer = new window.Peer();
     peerRef.current = peer;
     peer.on("open", function () {
+      history.replaceState(null, "", "#join=".concat(hostId, "&p=").concat(playerId));
       var conn = peer.connect(hostId);
       connections.current = [conn];
       conn.on("open", function () {
@@ -2112,13 +2150,198 @@ function usePeerRoom(state, setState, roomId, myPlayerId) {
   return {
     net: net,
     host: host,
+    join: join,
     send: send
   };
 }
-function Board(_ref31) {
-  var state = _ref31.state,
-    onEvent = _ref31.onEvent,
-    myPlayerId = _ref31.myPlayerId;
+function roomIdFromInput(input) {
+  var value = input.trim();
+  if (!value) return "";
+  try {
+    var url = new URL(value);
+    var params = new URLSearchParams(url.hash.replace("#", ""));
+    return params.get("join") || params.get("host") || value;
+  } catch (_unused) {
+    var _params = new URLSearchParams(value.replace(/^#/, ""));
+    return _params.get("join") || _params.get("host") || value;
+  }
+}
+function playerIdFromInput(input) {
+  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+  var value = input.trim();
+  if (!value) return fallback;
+  try {
+    var url = new URL(value);
+    var id = Number(new URLSearchParams(url.hash.replace("#", "")).get("p"));
+    return Number.isInteger(id) && id >= 0 && id <= 3 ? id : fallback;
+  } catch (_unused2) {
+    var _id = Number(new URLSearchParams(value.replace(/^#/, "")).get("p"));
+    return Number.isInteger(_id) && _id >= 0 && _id <= 3 ? _id : fallback;
+  }
+}
+function HomeScreen(_ref31) {
+  var net = _ref31.net,
+    onCreate = _ref31.onCreate,
+    onJoin = _ref31.onJoin;
+  var _useState13 = useState(""),
+    _useState14 = _slicedToArray(_useState13, 2),
+    joinInput = _useState14[0],
+    setJoinInput = _useState14[1];
+  var canJoin = Boolean(roomIdFromInput(joinInput));
+  return /*#__PURE__*/React.createElement("main", {
+    className: "homeMain"
+  }, /*#__PURE__*/React.createElement("section", {
+    className: "homeHero"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u6B21\u5143\u3092\u958B\u62D3\u3057\u3001\u9818\u754C\u8DEF\u3092\u4F38\u3070\u3057\u3001Discord\u3067\u4EA4\u6E09\u3057\u306A\u304C\u308910 VP\u3092\u76EE\u6307\u3059\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002"))), /*#__PURE__*/React.createElement("section", {
+    className: "homeActions"
+  }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Create a Room"), /*#__PURE__*/React.createElement("p", null, "\u30DB\u30B9\u30C8\u3068\u3057\u3066\u65B0\u3057\u3044\u90E8\u5C4B\u3092\u4F5C\u308A\u307E\u3059\u3002\u4F5C\u6210\u5F8C\u306B\u5171\u6709\u30EA\u30F3\u30AF\u3068Discord\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("button", {
+    className: "primary homeButton",
+    onClick: onCreate,
+    disabled: !window.Peer
+  }, /*#__PURE__*/React.createElement(RadioTower, {
+    size: 18
+  }), " \u90E8\u5C4B\u3092\u4F5C\u6210")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("h2", null, "Join a Room"), /*#__PURE__*/React.createElement("p", null, "\u53CB\u4EBA\u304B\u3089\u53D7\u3051\u53D6\u3063\u305F\u5171\u6709\u30EA\u30F3\u30AF\u3001\u307E\u305F\u306F\u90E8\u5C4BID\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u53C2\u52A0\u3057\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("input", {
+    value: joinInput,
+    onChange: function onChange(e) {
+      return setJoinInput(e.target.value);
+    },
+    placeholder: "\u5171\u6709\u30EA\u30F3\u30AF\u307E\u305F\u306F\u90E8\u5C4BID"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "homeButton",
+    onClick: function onClick() {
+      return onJoin(joinInput);
+    },
+    disabled: !canJoin || !window.Peer
+  }, /*#__PURE__*/React.createElement(Orbit, {
+    size: 18
+  }), " \u90E8\u5C4B\u306B\u53C2\u52A0"))), /*#__PURE__*/React.createElement("section", {
+    className: "homeNote"
+  }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
+}
+function LobbyScreen(_ref32) {
+  var state = _ref32.state,
+    myPlayerId = _ref32.myPlayerId,
+    setMyPlayerId = _ref32.setMyPlayerId,
+    net = _ref32.net,
+    onEvent = _ref32.onEvent,
+    onCopyInvite = _ref32.onCopyInvite,
+    onCopyRules = _ref32.onCopyRules,
+    copyStatus = _ref32.copyStatus,
+    onStartHuman = _ref32.onStartHuman,
+    onStartCpu = _ref32.onStartCpu;
+  var readyCount = readyHumanCount(state);
+  var ownReady = isReadyHuman(state.players[myPlayerId]);
+  var canHostStart = net.mode !== "guest" && state.phase === "setup" && !state.orderLocked;
+  var canStartHuman = canHostStart && readyCount === 4;
+  var canStartCpu = canHostStart && ownReady && readyCount < 4;
+  return /*#__PURE__*/React.createElement("main", {
+    className: "lobbyMain"
+  }, /*#__PURE__*/React.createElement("section", {
+    className: "topbar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5F85\u6A5F\u4E2D\u3002\u5E2D\u3092\u9078\u3073\u3001\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304B\u3089\u958B\u59CB\u3057\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", {
+    className: "net"
+  }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("button", {
+    onClick: onCopyInvite,
+    disabled: !net.share,
+    title: "\u5171\u6709\u30EA\u30F3\u30AF\u3064\u304D\u306E\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCopyRules,
+    title: "Discord\u306B\u56FA\u5B9A\u3059\u308B\u30EB\u30FC\u30EB\u6848\u5185\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u30EB\u30FC\u30EB\u6587"), copyStatus && /*#__PURE__*/React.createElement("span", {
+    className: "copyStatus"
+  }, copyStatus))), /*#__PURE__*/React.createElement("section", {
+    className: "lobbyGrid"
+  }, /*#__PURE__*/React.createElement("article", {
+    className: "lobbyPanel"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u3042\u306A\u305F\u306E\u5E2D"), /*#__PURE__*/React.createElement("label", null, "\u5E2D", /*#__PURE__*/React.createElement("select", {
+    value: myPlayerId,
+    onChange: function onChange(e) {
+      return setMyPlayerId(Number(e.target.value));
+    }
+  }, state.players.filter(function (player) {
+    return !player.isCpu || player.id === myPlayerId;
+  }).map(function (player) {
+    return /*#__PURE__*/React.createElement("option", {
+      key: player.id,
+      value: player.id
+    }, player.name);
+  }))), /*#__PURE__*/React.createElement("label", null, "\u30D7\u30EC\u30A4\u30E4\u30FC\u540D", /*#__PURE__*/React.createElement("input", {
+    value: state.players[myPlayerId].name,
+    onChange: function onChange(e) {
+      return onEvent({
+        type: "rename",
+        name: e.target.value
+      });
+    },
+    disabled: state.players[myPlayerId].isCpu,
+    placeholder: "\u540D\u524D\u3092\u5165\u529B"
+  }))), /*#__PURE__*/React.createElement("article", {
+    className: "lobbyPanel"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u30B2\u30FC\u30E0\u8A2D\u5B9A"), /*#__PURE__*/React.createElement("div", {
+    className: "modeChooser",
+    "aria-label": "\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "normal" ? "selected" : "",
+    onClick: function onClick() {
+      return onEvent({
+        type: "setGameMode",
+        gameMode: "normal"
+      });
+    },
+    disabled: !canHostStart,
+    title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
+  }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
+    className: state.gameMode === "hard" ? "selected" : "",
+    onClick: function onClick() {
+      return onEvent({
+        type: "setGameMode",
+        gameMode: "hard"
+      });
+    },
+    disabled: !canHostStart,
+    title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
+  }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u5165\u529B\u6E08\u307F\u30D7\u30EC\u30A4\u30E4\u30FC: ", readyCount, " / 4"), readyCount === 4 ? /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onStartHuman,
+    disabled: !canStartHuman
+  }, /*#__PURE__*/React.createElement(Shuffle, {
+    size: 18
+  }), " \u30B2\u30FC\u30E0\u958B\u59CB") : /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onStartCpu,
+    disabled: !canStartCpu
+  }, /*#__PURE__*/React.createElement(Orbit, {
+    size: 18
+  }), " CPU\u3092\u5165\u308C\u3066\u958B\u59CB"), net.mode === "guest" && /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u958B\u59CB\u64CD\u4F5C\u306F\u30DB\u30B9\u30C8\u304C\u884C\u3044\u307E\u3059\u3002"), !ownReady && /*#__PURE__*/React.createElement("p", {
+    className: "spaceportNote"
+  }, "\u307E\u305A\u81EA\u5206\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u540D\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"))), /*#__PURE__*/React.createElement("section", {
+    className: "players lobbyPlayers"
+  }, state.players.map(function (player) {
+    return /*#__PURE__*/React.createElement("article", {
+      key: player.id,
+      style: {
+        "--player": player.color
+      },
+      className: player.id === myPlayerId ? "active" : ""
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
+      className: "badge cpuBadge"
+    }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
+      className: "badge readyBadge"
+    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, "\u5E2D ", player.id + 1)), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"));
+  })));
+}
+function Board(_ref33) {
+  var state = _ref33.state,
+    onEvent = _ref33.onEvent,
+    myPlayerId = _ref33.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2308,39 +2531,56 @@ function Board(_ref31) {
   }));
 }
 function App() {
-  var initialRoom = useMemo(function () {
-    return new URLSearchParams(location.hash.replace("#", "")).get("room") || crypto.randomUUID().slice(0, 8);
+  var initialParams = useMemo(function () {
+    return new URLSearchParams(location.hash.replace("#", ""));
   }, []);
-  var _useState13 = useState(function () {
+  var initialRoom = useMemo(function () {
+    return initialParams.get("room") || crypto.randomUUID().slice(0, 8);
+  }, [initialParams]);
+  var startsInRoom = useMemo(function () {
+    return Boolean(initialParams.get("join") || initialParams.get("host"));
+  }, [initialParams]);
+  var _useState15 = useState(function () {
       return createGame(initialRoom);
     }),
-    _useState14 = _slicedToArray(_useState13, 2),
-    state = _useState14[0],
-    setState = _useState14[1];
-  var _useState15 = useState(function () {
-      return Number(new URLSearchParams(location.hash.replace("#", "")).get("p") || 0);
-    }),
     _useState16 = _slicedToArray(_useState15, 2),
-    myPlayerId = _useState16[0],
-    setMyPlayerId = _useState16[1];
-  var _useState17 = useState({
+    state = _useState16[0],
+    setState = _useState16[1];
+  var _useState17 = useState(function () {
+      return Number(initialParams.get("p") || 0);
+    }),
+    _useState18 = _slicedToArray(_useState17, 2),
+    myPlayerId = _useState18[0],
+    setMyPlayerId = _useState18[1];
+  var _useState19 = useState(function () {
+      return startsInRoom ? "lobby" : "home";
+    }),
+    _useState20 = _slicedToArray(_useState19, 2),
+    screen = _useState20[0],
+    setScreen = _useState20[1];
+  var _useState21 = useState({
       give: "rock",
       take: "food"
     }),
-    _useState18 = _slicedToArray(_useState17, 2),
-    trade = _useState18[0],
-    setTrade = _useState18[1];
-  var _useState19 = useState({
+    _useState22 = _slicedToArray(_useState21, 2),
+    trade = _useState22[0],
+    setTrade = _useState22[1];
+  var _useState23 = useState({
       resource: "rock",
       a: "rock",
       b: "material"
     }),
-    _useState20 = _slicedToArray(_useState19, 2),
-    devChoice = _useState20[0],
-    setDevChoice = _useState20[1];
+    _useState24 = _slicedToArray(_useState23, 2),
+    devChoice = _useState24[0],
+    setDevChoice = _useState24[1];
+  var _useState25 = useState(""),
+    _useState26 = _slicedToArray(_useState25, 2),
+    copyStatus = _useState26[0],
+    setCopyStatus = _useState26[1];
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
+    join = _usePeerRoom.join,
     send = _usePeerRoom.send;
   function act(event) {
     var owned = _objectSpread(_objectSpread({}, event), {}, {
@@ -2351,6 +2591,9 @@ function App() {
       return reducer(prev, owned);
     });
   }
+  useEffect(function () {
+    if (state.orderLocked && screen === "lobby") setScreen("game");
+  }, [state.orderLocked, screen]);
   useEffect(function () {
     if (net.mode === "guest") return;
     var event = nextCpuEvent(state);
@@ -2379,6 +2622,82 @@ function App() {
   var turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map(function (id) {
     return state.players[id].name;
   }).join(" → ");
+  var shareUrl = net.share || location.href;
+  function copyToClipboard(text, label) {
+    if (!navigator.clipboard) {
+      setCopyStatus("コピー機能が使えません");
+      return;
+    }
+    navigator.clipboard.writeText(text).then(function () {
+      setCopyStatus("".concat(label, "\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F"));
+      window.setTimeout(function () {
+        return setCopyStatus("");
+      }, 2200);
+    })["catch"](function () {
+      setCopyStatus("コピーできませんでした");
+      window.setTimeout(function () {
+        return setCopyStatus("");
+      }, 2200);
+    });
+  }
+  function createRoomFromHome() {
+    host();
+    setMyPlayerId(0);
+    setScreen("lobby");
+  }
+  function joinRoomFromHome(input) {
+    var roomId = roomIdFromInput(input);
+    if (!roomId) return;
+    var playerId = playerIdFromInput(input, 1);
+    setMyPlayerId(playerId);
+    join(roomId, playerId);
+    setScreen("lobby");
+  }
+  function startHumanGame() {
+    act({
+      type: "randomizeOrder"
+    });
+    setScreen("game");
+  }
+  function startCpuGame() {
+    if (net.mode === "guest") return;
+    setState(function (prev) {
+      var filled = reducer(prev, {
+        type: "fillCpu",
+        playerId: myPlayerId
+      });
+      return reducer(filled, {
+        type: "randomizeOrder",
+        playerId: myPlayerId
+      });
+    });
+    setScreen("game");
+  }
+  if (screen === "home") {
+    return /*#__PURE__*/React.createElement(HomeScreen, {
+      net: net,
+      onCreate: createRoomFromHome,
+      onJoin: joinRoomFromHome
+    });
+  }
+  if (screen === "lobby" && !state.orderLocked) {
+    return /*#__PURE__*/React.createElement(LobbyScreen, {
+      state: state,
+      myPlayerId: myPlayerId,
+      setMyPlayerId: setMyPlayerId,
+      net: net,
+      onEvent: act,
+      onCopyInvite: function onCopyInvite() {
+        return copyToClipboard(discordInviteText(state, shareUrl), "募集文");
+      },
+      onCopyRules: function onCopyRules() {
+        return copyToClipboard(discordRulesText(), "ルール案内");
+      },
+      copyStatus: copyStatus,
+      onStartHuman: startHumanGame,
+      onStartCpu: startCpuGame
+    });
+  }
   return /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u3092\u5E83\u3052\u3001\u5927\u90FD\u5E02\u3078\u80B2\u3066\u300110\u70B9\u3092\u76EE\u6307\u30594\u4EBA\u7528\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002")), /*#__PURE__*/React.createElement("div", {
@@ -2390,14 +2709,30 @@ function App() {
     size: 17
   }), " \u90E8\u5C4B\u4F5C\u6210"), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
-      var _navigator$clipboard;
-      return net.share && ((_navigator$clipboard = navigator.clipboard) === null || _navigator$clipboard === void 0 ? void 0 : _navigator$clipboard.writeText(net.share));
+      return copyToClipboard(net.share, "共有リンク");
     },
     disabled: !net.share,
     title: "\u5171\u6709\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC"
   }, /*#__PURE__*/React.createElement(Copy, {
     size: 17
-  }), " \u5171\u6709"))), /*#__PURE__*/React.createElement("section", {
+  }), " \u5171\u6709"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return copyToClipboard(discordInviteText(state, shareUrl), "Discord募集文");
+    },
+    disabled: !net.share,
+    title: "Discord\u306B\u8CBC\u308B\u52DF\u96C6\u6587\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u52DF\u96C6\u6587"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
+      return copyToClipboard(discordRulesText(), "ルール案内");
+    },
+    title: "Discord\u306B\u56FA\u5B9A\u3059\u308B\u30EB\u30FC\u30EB\u6848\u5185\u3092\u30B3\u30D4\u30FC"
+  }, /*#__PURE__*/React.createElement(Copy, {
+    size: 17
+  }), " \u30EB\u30FC\u30EB\u6587"), copyStatus && /*#__PURE__*/React.createElement("span", {
+    className: "copyStatus"
+  }, copyStatus))), /*#__PURE__*/React.createElement("section", {
     className: "players"
   }, state.players.map(function (player) {
     return /*#__PURE__*/React.createElement("article", {
@@ -2412,18 +2747,7 @@ function App() {
       className: "badge"
     }, "\u6700\u9577\u9818\u754C\u8DEF"), player.bonus.largestTv && /*#__PURE__*/React.createElement("span", {
       className: "badge"
-    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)), /*#__PURE__*/React.createElement("button", {
-      className: "cpuToggle",
-      onClick: function onClick() {
-        return act({
-          type: "setCpu",
-          targetId: player.id,
-          isCpu: !player.isCpu
-        });
-      },
-      disabled: player.id === myPlayerId || net.mode === "guest" || state.orderLocked,
-      title: state.orderLocked ? "開始後はCPUを切り替えられません" : player.id === myPlayerId ? "自分の席はCPUにできません" : "CPUを切り替え"
-    }, player.isCpu ? "CPU解除" : "CPUにする"));
+    }, "\u6700\u5927TVA\u529B")), /*#__PURE__*/React.createElement("span", null, getVp(state, player.id), " VP")), /*#__PURE__*/React.createElement("p", null, visibleResourceText(player, myPlayerId)), /*#__PURE__*/React.createElement("small", null, "TVA ", player.playedTv, " / \u672A\u77E5\u3078\u306E\u65C5 ", player.hiddenNewFrontiers.length, "\u679A / \u516C\u958B\u6E08\u307F: ", publicPlayedFrontiers(player), " / ", spaceportText(state, player.id)));
   })), /*#__PURE__*/React.createElement("section", {
     className: "layout"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2460,53 +2784,11 @@ function App() {
       key: p.id,
       value: p.id
     }, p.name, p.isCpu ? " CPU" : "");
-  }))), /*#__PURE__*/React.createElement("input", {
-    value: me.name,
-    onChange: function onChange(e) {
-      return act({
-        type: "rename",
-        name: e.target.value
-      });
-    },
-    disabled: me.isCpu
-  })), /*#__PURE__*/React.createElement(ResourceHand, {
+  })))), /*#__PURE__*/React.createElement(ResourceHand, {
     player: me
   }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modeChooser",
-    "aria-label": "\u30B2\u30FC\u30E0\u30E2\u30FC\u30C9"
   }, /*#__PURE__*/React.createElement("button", {
-    className: state.gameMode === "normal" ? "selected" : "",
-    onClick: function onClick() {
-      return act({
-        type: "setGameMode",
-        gameMode: "normal"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked,
-    title: "\u6570\u5B57\u306E\u4E26\u3073\u9806\u3092\u56FA\u5B9A\u3057\u305F\u6A19\u6E96\u76E4\u9762"
-  }, "\u30CE\u30FC\u30DE\u30EB"), /*#__PURE__*/React.createElement("button", {
-    className: state.gameMode === "hard" ? "selected" : "",
-    onClick: function onClick() {
-      return act({
-        type: "setGameMode",
-        gameMode: "hard"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked,
-    title: "\u5730\u5F62\u3068\u6570\u5B57\u3092\u3059\u3079\u3066\u30E9\u30F3\u30C0\u30E0\u306B\u3057\u305F\u76E4\u9762"
-  }, "\u30CF\u30FC\u30C9")), /*#__PURE__*/React.createElement("button", {
-    className: "primary",
-    onClick: function onClick() {
-      return act({
-        type: "randomizeOrder"
-      });
-    },
-    disabled: state.phase !== "setup" || state.orderLocked || state.setupStep > 0
-  }, /*#__PURE__*/React.createElement(Shuffle, {
-    size: 18
-  }), " \u9806\u756A\u6C7A\u5B9A\u3057\u3066\u958B\u59CB"), /*#__PURE__*/React.createElement("button", {
     className: "primary",
     onClick: function onClick() {
       return act({

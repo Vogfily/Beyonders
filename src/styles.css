@@ -142,6 +142,165 @@ h2 {
   font-size: 13px;
 }
 
+.copyStatus {
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid rgba(165, 243, 252, 0.35);
+  border-radius: 8px;
+  color: #d9fbff;
+  background: rgba(14, 116, 144, 0.25);
+}
+
+.homeMain {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  gap: 24px;
+  overflow: hidden;
+}
+
+.homeMain::before,
+.homeMain::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+}
+
+.homeMain::before {
+  z-index: -2;
+  background-image: url("../assets/board/home_universe.png");
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.16) translate3d(-3%, -2%, 0);
+  animation: homeSpaceDrift 16s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.homeMain::after {
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(49, 182, 196, 0.2), transparent 34%),
+    linear-gradient(135deg, rgba(7, 17, 31, 0.66), rgba(12, 18, 32, 0.88));
+}
+
+@keyframes homeSpaceDrift {
+  0% {
+    transform: scale(1.16) translate3d(-3%, -2%, 0);
+  }
+  45% {
+    transform: scale(1.24) translate3d(2%, -1%, 0);
+  }
+  100% {
+    transform: scale(1.2) translate3d(3%, 2%, 0);
+  }
+}
+
+.homeHero {
+  display: grid;
+  gap: 14px;
+}
+
+.homeHero h1 {
+  max-width: 100%;
+  margin: 0;
+  font-size: clamp(42px, 7vw, 84px);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.homeHero p {
+  max-width: 760px;
+  color: #c9d6ea;
+  font-size: 17px;
+}
+
+.homeActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.homeActions article {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 230px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 18, 32, 0.82);
+}
+
+.homeActions h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.homeActions p,
+.homeNote p {
+  color: #aeb9cf;
+}
+
+.homeButton {
+  width: fit-content;
+  min-width: 180px;
+}
+
+.homeNote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.homeNote span {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: #d8e8ff;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+}
+
+.lobbyMain {
+  display: grid;
+  gap: 16px;
+}
+
+.lobbyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.lobbyPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 18, 32, 0.82);
+}
+
+.lobbyPanel label {
+  display: grid;
+  gap: 5px;
+  color: #b9c6da;
+  font-size: 12px;
+}
+
+.lobbyPlayers {
+  margin-top: 0;
+}
+
+.readyBadge {
+  background: #a7f3d0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
@@ -711,6 +870,18 @@ h2 {
   .net {
     justify-content: flex-start;
     margin-top: 14px;
+  }
+
+  .homeActions {
+    grid-template-columns: 1fr;
+  }
+
+  .lobbyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .homeActions article {
+    min-height: 0;
   }
 
   .board {
