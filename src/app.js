@@ -2454,7 +2454,7 @@ function LobbyScreen(_ref36) {
       className: "badge cpuBadge"
     }, "CPU"), isReadyHuman(player) && /*#__PURE__*/React.createElement("span", {
       className: "badge readyBadge"
-    }, "\u6E96\u5099OK")), /*#__PURE__*/React.createElement("span", null, String.fromCharCode(65 + player.id))), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"), canParentControl && !isParentPlayer(player.id) && !player.isCpu && /*#__PURE__*/React.createElement("button", {
+    }, "\u6E96\u5099OK"))), /*#__PURE__*/React.createElement("p", null, player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"), canParentControl && !isParentPlayer(player.id) && !player.isCpu && /*#__PURE__*/React.createElement("button", {
       className: "cpuToggle dangerButton",
       onClick: function onClick() {
         return onEvent({

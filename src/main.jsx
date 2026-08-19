@@ -1943,7 +1943,6 @@ function LobbyScreen({
                 {player.isCpu && <span className="badge cpuBadge">CPU</span>}
                 {isReadyHuman(player) && <span className="badge readyBadge">準備OK</span>}
               </strong>
-              <span>{String.fromCharCode(65 + player.id)}</span>
             </div>
             <p>{player.isCpu ? "CPUが担当します" : isReadyHuman(player) ? "参加中" : "名前入力待ち"}</p>
             {canParentControl && !isParentPlayer(player.id) && !player.isCpu && (
