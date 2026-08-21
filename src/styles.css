@@ -693,13 +693,14 @@ h2 {
 }
 
 .cost span.missing {
-  border: 1px solid rgba(248, 113, 113, 0.72);
+  border-color: transparent;
   color: #aeb9cf;
   background: rgba(15, 23, 42, 0.72);
   filter: saturate(0.6);
 }
 
 .cost span.missing .resourceIcon {
+  border-color: transparent;
   opacity: 0.52;
   filter: grayscale(0.35) brightness(0.72);
 }
