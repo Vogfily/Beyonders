@@ -1428,14 +1428,17 @@ function Cost({ cost, player }) {
   );
 }
 
-function BuildOption({ label, cost, player }) {
+function BuildOption({ label, cost, player, icon: IconComponent }) {
   const missing = missingCost(player, cost);
   const affordable = !Object.keys(missing).length;
   return (
     <article className={`buildOption ${affordable ? "available" : "short"}`}>
       <div className="buildOptionHead">
-        <strong>{label}</strong>
-        <span>{affordable ? "建設可能" : "不足"}</span>
+        <div className="buildOptionTitle">
+          <span className="buildOptionIcon" aria-hidden="true"><IconComponent /></span>
+          <strong>{label}</strong>
+        </div>
+        <span className="buildStatus">{affordable ? "OK" : "不足"}</span>
       </div>
       <Cost cost={cost} player={player} />
       {!affordable && <small>不足: {missingCostText(missing)}</small>}
@@ -2590,12 +2593,12 @@ function App() {
           </div>
 
           <div className="costs">
-            <h2>建設可能</h2>
+            <h2>建設コスト</h2>
             <div className="buildOptions">
-              <BuildOption label="領界路" cost={COSTS.route} player={me} />
-              <BuildOption label="小都市" cost={COSTS.planet} player={me} />
-              <BuildOption label="大都市" cost={COSTS.star} player={me} />
-              <BuildOption label="未知への旅" cost={COSTS.frontier} player={me} />
+              <BuildOption label="領界路" cost={COSTS.route} player={me} icon={Rocket} />
+              <BuildOption label="小都市" cost={COSTS.planet} player={me} icon={Orbit} />
+              <BuildOption label="大都市" cost={COSTS.star} player={me} icon={Satellite} />
+              <BuildOption label="未知への旅" cost={COSTS.frontier} player={me} icon={Shuffle} />
             </div>
             <button onClick={() => act({ type: "buyDev" })} disabled={!mainActionable}>
               <Shuffle size={17} /> 未知への旅を獲得

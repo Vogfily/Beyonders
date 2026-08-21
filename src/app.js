@@ -1863,14 +1863,22 @@ function Cost(_ref26) {
 function BuildOption(_ref29) {
   var label = _ref29.label,
     cost = _ref29.cost,
-    player = _ref29.player;
+    player = _ref29.player,
+    IconComponent = _ref29.icon;
   var missing = missingCost(player, cost);
   var affordable = !Object.keys(missing).length;
   return /*#__PURE__*/React.createElement("article", {
     className: "buildOption ".concat(affordable ? "available" : "short")
   }, /*#__PURE__*/React.createElement("div", {
     className: "buildOptionHead"
-  }, /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("span", null, affordable ? "建設可能" : "不足")), /*#__PURE__*/React.createElement(Cost, {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "buildOptionTitle"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "buildOptionIcon",
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement(IconComponent, null)), /*#__PURE__*/React.createElement("strong", null, label)), /*#__PURE__*/React.createElement("span", {
+    className: "buildStatus"
+  }, affordable ? "OK" : "不足")), /*#__PURE__*/React.createElement(Cost, {
     cost: cost,
     player: player
   }), !affordable && /*#__PURE__*/React.createElement("small", null, "\u4E0D\u8DB3: ", missingCostText(missing)));
@@ -3297,24 +3305,28 @@ function App() {
     size: 17
   }), " \u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA")), /*#__PURE__*/React.createElement("div", {
     className: "costs"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u53EF\u80FD"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u30B3\u30B9\u30C8"), /*#__PURE__*/React.createElement("div", {
     className: "buildOptions"
   }, /*#__PURE__*/React.createElement(BuildOption, {
     label: "\u9818\u754C\u8DEF",
     cost: COSTS.route,
-    player: me
+    player: me,
+    icon: Rocket
   }), /*#__PURE__*/React.createElement(BuildOption, {
     label: "\u5C0F\u90FD\u5E02",
     cost: COSTS.planet,
-    player: me
+    player: me,
+    icon: Orbit
   }), /*#__PURE__*/React.createElement(BuildOption, {
     label: "\u5927\u90FD\u5E02",
     cost: COSTS.star,
-    player: me
+    player: me,
+    icon: Satellite
   }), /*#__PURE__*/React.createElement(BuildOption, {
     label: "\u672A\u77E5\u3078\u306E\u65C5",
     cost: COSTS.frontier,
-    player: me
+    player: me,
+    icon: Shuffle
   })), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       return act({
