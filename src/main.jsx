@@ -11,29 +11,28 @@ const RadioTower = () => <Icon label="⌁" />;
 const Rocket = () => <Icon label="↗" />;
 const Satellite = () => <Icon label="◉" />;
 const Shuffle = () => <Icon label="⇄" />;
-const Swords = () => <Icon label="!" />;
 const Undo2 = () => <Icon label="✓" />;
 const Music = () => <Icon label="♪" />;
 const Muted = () => <Icon label="×" />;
 
 const RESOURCES = {
-  rock: { name: "レアメタル", terrain: "鉱物次元", color: "#a3544a", icon: "assets/resources/raremetal.png" },
-  rare: { name: "ナノマシン", terrain: "機械次元", color: "#64748b", icon: "assets/resources/nanomachine.png" },
-  material: { name: "建材", terrain: "熱帯次元", color: "#2f855a", icon: "assets/resources/building_materials.png" },
-  nano: { name: "皮革", terrain: "大草原", color: "#7c9a3e", icon: "assets/resources/leather.png" },
-  food: { name: "穀物", terrain: "肥沃な大地", color: "#d5a11e", icon: "assets/resources/food.png" },
+  rock: { name: "レアメタル", terrain: "鉱物次元", color: "#a3544a", icon: "assets/resources/raremetal.jpg" },
+  rare: { name: "ナノマシン", terrain: "機械次元", color: "#64748b", icon: "assets/resources/nanomachine.jpg" },
+  material: { name: "建材", terrain: "熱帯次元", color: "#2f855a", icon: "assets/resources/building_materials.jpg" },
+  nano: { name: "皮革", terrain: "大草原", color: "#7c9a3e", icon: "assets/resources/leather.jpg" },
+  food: { name: "穀物", terrain: "肥沃な大地", color: "#d5a11e", icon: "assets/resources/food.jpg" },
 };
 
 const RESOURCE_KEYS = Object.keys(RESOURCES);
 const TILE_IMAGES = {
-  rock: "assets/tiles/ore_dimension.png",
-  rare: "assets/tiles/machinery_dimension.png",
-  material: "assets/tiles/tropical_dimension.png",
-  nano: "assets/tiles/great_plains.png",
-  food: "assets/tiles/fertile_ground.png",
-  desert: "assets/tiles/void.png",
+  rock: "assets/tiles/ore_dimension.jpg",
+  rare: "assets/tiles/machinery_dimension.jpg",
+  material: "assets/tiles/tropical_dimension.jpg",
+  nano: "assets/tiles/great_plains.jpg",
+  food: "assets/tiles/fertile_ground.jpg",
+  desert: "assets/tiles/void.jpg",
 };
-const BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
+const BOARD_BACKGROUND_IMAGE = "assets/board/universe.jpg";
 const BGM_TRACK = "assets/audio/space_world.mp3";
 const BGM_STORAGE_KEY = "beyonders-bgm-enabled";
 const PLAYERS = [
@@ -73,6 +72,16 @@ const DEV_NAMES = {
   point: "勝利記録",
 };
 
+const DEV_IMAGES = {
+  tv: "assets/cards/tva.jpg",
+  route: "assets/cards/route_opening.jpg",
+  collect: "assets/cards/collect.jpg",
+  plenty: "assets/cards/supply_satellite.jpg",
+  point: "assets/cards/victory_record.jpg",
+};
+
+const DEV_DISPLAY_ORDER = ["tv", "route", "collect", "plenty", "point"];
+
 const FIXED_SPACEPORTS = [
   { tileNumber: 3, side: "upperLeft", type: null },
   { tileNumber: 8, side: "left", type: null },
@@ -99,6 +108,7 @@ const BUILD_LABEL = {
   planet: "小都市",
   star: "大都市",
   frontier: "未知への旅",
+  trade: "通信交易",
 };
 
 const TILE_SETUP = [
@@ -446,6 +456,12 @@ function createGame(roomId = generateRoomId()) {
 
 function canAfford(player, cost) {
   return Object.entries(cost).every(([key, amount]) => (player.resources[key] || 0) >= amount);
+}
+
+function canBankTradeWithAnyResource(state, playerId) {
+  const player = state.players[playerId];
+  if (!player) return false;
+  return RESOURCE_KEYS.some((key) => (player.resources[key] || 0) >= tradeRateFor(state, playerId, key));
 }
 
 function pay(player, cost) {
@@ -813,10 +829,9 @@ function finishCriminalMove(state, actor, tileId) {
 function getVp(state, playerId) {
   const planets = Object.values(state.buildings).filter((b) => b.player === playerId && b.type === "planet").length;
   const stars = Object.values(state.buildings).filter((b) => b.player === playerId && b.type === "star").length;
-  const points = state.players[playerId].hiddenNewFrontiers.filter((card) => frontierType(card) === "point").length;
   const publicPoints = (state.players[playerId].playedNewFrontiers || []).filter((card) => card === "point").length;
   const bonus = (state.players[playerId].bonus.longest ? 2 : 0) + (state.players[playerId].bonus.largestTv ? 2 : 0);
-  return planets + stars * 2 + points + publicPoints + bonus;
+  return planets + stars * 2 + publicPoints + bonus;
 }
 
 function distanceRule(state, vertexId) {
@@ -1413,29 +1428,24 @@ function Cost({ cost, player }) {
       {Object.entries(cost).map(([key, value]) => {
         const enough = player ? (player.resources?.[key] || 0) >= value : true;
         return (
-        <span key={key} className={enough ? "enough" : "missing"} style={{ "--dot": RESOURCES[key].color }}>
-          <img className="resourceIcon" src={RESOURCES[key].icon} alt="" />
-          {RESOURCES[key].name} {value}
-        </span>
+          <span key={key} className={enough ? "enough" : "missing"} style={{ "--dot": RESOURCES[key].color }}>
+            <img className="resourceIcon" src={RESOURCES[key].icon} alt="" />
+            {RESOURCES[key].name} {value}
+          </span>
         );
       })}
     </span>
   );
 }
 
-function BuildOption({ label, cost, player, icon: IconComponent }) {
+function CostTableRow({ label, cost, player }) {
   const missing = missingCost(player, cost);
   const affordable = !Object.keys(missing).length;
   return (
-    <article className={`buildOption ${affordable ? "available" : "short"}`}>
-      <div className="buildOptionHead">
-        <div className="buildOptionTitle">
-          <span className="buildOptionIcon" aria-hidden="true"><IconComponent /></span>
-          <strong>{label}</strong>
-        </div>
-      </div>
+    <div className={`costRow ${affordable ? "available" : "short"}`}>
+      <strong>{label}</strong>
       <Cost cost={cost} player={player} />
-    </article>
+    </div>
   );
 }
 
@@ -1476,6 +1486,134 @@ function ResourceBundleInput({ title, value, onChange }) {
           />
         </label>
       ))}
+    </div>
+  );
+}
+
+function canUseFrontierCard(card, state, player, mainActionable) {
+  return (
+    mainActionable &&
+    !state.negotiation &&
+    player.frontierPlayedTurn !== state.turnCount &&
+    canPlayFrontier(card, state)
+  );
+}
+
+function FrontierHand({ player, state, mainActionable, onCardClick }) {
+  const cards = player.hiddenNewFrontiers || [];
+  const grouped = DEV_DISPLAY_ORDER
+    .map((type) => ({
+      type,
+      cards: cards
+        .map((card, index) => ({ card, index }))
+        .filter(({ card }) => frontierType(card) === type),
+    }))
+    .filter((group) => group.cards.length);
+
+  return (
+    <section className="frontierShelf">
+      <div className="frontierShelfHeader">
+        <h2>所持カード一覧</h2>
+        <span>{cards.length}枚</span>
+      </div>
+      {cards.length ? (
+        <div className="frontierStacks">
+          {grouped.map((group) => (
+            <div key={group.type} className="frontierStack" style={{ height: `${156 + (group.cards.length - 1) * 30}px` }}>
+              {group.cards.map(({ card, index }, stackIndex) => {
+                const usable = canUseFrontierCard(card, state, player, mainActionable);
+                return (
+                  <button
+                    key={`${group.type}-${frontierBoughtTurn(card)}-${index}`}
+                    className={`frontierCard ${usable ? "usable" : "locked"}`}
+                    style={{ "--stack-index": stackIndex }}
+                    onClick={() => usable && onCardClick(card)}
+                    disabled={!usable}
+                    title={DEV_NAMES[group.type]}
+                  >
+                    <img src={DEV_IMAGES[group.type]} alt={DEV_NAMES[group.type]} />
+                    <span>{DEV_NAMES[group.type]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">なし</p>
+      )}
+    </section>
+  );
+}
+
+function ResourceChoiceButtons({ value, onChange }) {
+  return (
+    <div className="resourceChoiceButtons">
+      {RESOURCE_KEYS.map((key) => (
+        <button
+          key={key}
+          type="button"
+          className={value === key ? "selected" : ""}
+          onClick={() => onChange(key)}
+        >
+          <img className="resourceIcon" src={RESOURCES[key].icon} alt="" />
+          {RESOURCES[key].name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FrontierUseDialog({ pending, choice, onChoiceChange, onConfirm, onApply, onCancel }) {
+  if (!pending) return null;
+  const name = DEV_NAMES[pending.type];
+  const isChoiceStep = pending.step === "choice";
+  return (
+    <div className="modalBackdrop">
+      <div className="frontierDialog">
+        <img className="frontierDialogImage" src={DEV_IMAGES[pending.type]} alt={name} />
+        <div className="frontierDialogBody">
+          <h2>{name}</h2>
+          {!isChoiceStep && (
+            <>
+              <p>このカードを使用しますか?</p>
+              <div className="dialogActions">
+                <button className="primary" onClick={onConfirm}>YES</button>
+                <button onClick={onCancel}>NO</button>
+              </div>
+            </>
+          )}
+          {isChoiceStep && pending.type === "collect" && (
+            <>
+              <p>押収する資材を選択</p>
+              <ResourceChoiceButtons value={choice.resource} onChange={(resource) => onChoiceChange({ ...choice, resource })} />
+              <div className="dialogActions">
+                <button className="primary" onClick={onApply}>適用</button>
+                <button onClick={onCancel}>NO</button>
+              </div>
+            </>
+          )}
+          {isChoiceStep && pending.type === "plenty" && (
+            <>
+              <p>受け取る資材を2つ選択</p>
+              <div className="dualResourceChoice">
+                <div>
+                  <strong>1つ目</strong>
+                  <ResourceChoiceButtons value={choice.a} onChange={(a) => onChoiceChange({ ...choice, a })} />
+                </div>
+                <div>
+                  <strong>2つ目</strong>
+                  <ResourceChoiceButtons value={choice.b} onChange={(b) => onChoiceChange({ ...choice, b })} />
+                </div>
+              </div>
+              <div className="dialogActions">
+                <button className="primary" onClick={onApply}>適用</button>
+                <button onClick={onCancel}>NO</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2295,7 +2433,8 @@ function App() {
   const [myPlayerId, setMyPlayerId] = useState(() => Number(initialParams.get("p") || 0));
   const [screen, setScreen] = useState(() => startsInRoom ? "lobby" : "home");
   const [trade, setTrade] = useState({ give: "rock", take: "food" });
-  const [devChoice, setDevChoice] = useState({ resource: "rock", a: "rock", b: "material" });
+  const [frontierChoice, setFrontierChoice] = useState({ resource: "rock", a: "rock", b: "material" });
+  const [pendingFrontier, setPendingFrontier] = useState(null);
   const [copyStatus, setCopyStatus] = useState("");
   const [homeAlert, setHomeAlert] = useState("");
   const lastKickedAt = useRef(null);
@@ -2356,6 +2495,11 @@ function App() {
   const actionable = state.phase === "setup" ? state.orderLocked && active.id === myPlayerId : state.turn === myPlayerId;
   const mainActionable = actionable && isMainPhase(state);
   const currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
+  const canRouteAction = mainActionable && canAfford(me, COSTS.route);
+  const canPlanetAction = mainActionable && canAfford(me, COSTS.planet);
+  const canStarAction = mainActionable && canAfford(me, COSTS.star);
+  const canFrontierAction = mainActionable && canAfford(me, COSTS.frontier) && state.deck.length > 0;
+  const canTradeAction = mainActionable && canBankTradeWithAnyResource(state, myPlayerId);
   const selectablePlayers = state.players.filter((player) => !player.isCpu || player.id === myPlayerId);
   const turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ");
   const shareUrl = net.share || location.href;
@@ -2425,6 +2569,31 @@ function App() {
     setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
     showHomeAlert("ホストがゲームを終了しました。");
+  }
+
+  function selectFrontierCard(card) {
+    setPendingFrontier({ type: frontierType(card), step: "confirm" });
+  }
+
+  function confirmFrontierUse() {
+    if (!pendingFrontier) return;
+    if (["collect", "plenty"].includes(pendingFrontier.type)) {
+      setPendingFrontier({ ...pendingFrontier, step: "choice" });
+      return;
+    }
+    act({ type: "playDev", card: pendingFrontier.type });
+    setPendingFrontier(null);
+  }
+
+  function applyFrontierUse() {
+    if (!pendingFrontier) return;
+    if (pendingFrontier.type === "collect") {
+      act({ type: "playDev", card: "collect", resource: frontierChoice.resource });
+    }
+    if (pendingFrontier.type === "plenty") {
+      act({ type: "playDev", card: "plenty", a: frontierChoice.a, b: frontierChoice.b });
+    }
+    setPendingFrontier(null);
   }
 
   function startHumanGame() {
@@ -2542,6 +2711,12 @@ function App() {
             <span className="pill">操作: {BUILD_LABEL[state.action] || (state.action === "criminal" ? "ラヴェジャーズ" : state.action === "discard" ? "資源廃棄" : state.action === "steal" ? "資源奪取" : state.action)}</span>
             {state.dice && <span className="pill">出目: {state.dice.join(" + ")} = {state.dice[0] + state.dice[1]}</span>}
           </div>
+          {state.action === "criminal" && (state.criminalMover ?? state.turn) === myPlayerId && (
+            <div className="actionPrompt">RVの移動先を選択してください</div>
+          )}
+          {state.action === "freeRoute" && state.turn === myPlayerId && (
+            <div className="actionPrompt">領界路を建設してください{state.freeRoutesLeft ? ` あと${state.freeRoutesLeft}本` : ""}</div>
+          )}
           <Board state={state} onEvent={act} myPlayerId={myPlayerId} />
         </div>
 
@@ -2561,6 +2736,8 @@ function App() {
 
           <ResourceHand player={me} />
 
+          <FrontierHand player={me} state={state} mainActionable={mainActionable} onCardClick={selectFrontierCard} />
+
           <div className="actions">
             <button className="primary" onClick={() => act({ type: "roll" })} disabled={!actionable || state.phase !== "play" || state.rolled}>
               <Dice5 size={18} /> サイコロ
@@ -2571,33 +2748,34 @@ function App() {
           </div>
 
           <div className="tools">
-            <button className={state.action === "route" ? "selected" : ""} onClick={() => act({ type: "setAction", action: "route" })}>
+            <button className={`${state.action === "route" ? "selected" : ""} ${canRouteAction ? "available" : "unavailable"}`} onClick={() => act({ type: "setAction", action: "route" })} disabled={!canRouteAction}>
               <Rocket size={17} /> 領界路
             </button>
-            <button className={state.action === "planet" ? "selected" : ""} onClick={() => act({ type: "setAction", action: "planet" })}>
+            <button className={`${state.action === "planet" ? "selected" : ""} ${canPlanetAction ? "available" : "unavailable"}`} onClick={() => act({ type: "setAction", action: "planet" })} disabled={!canPlanetAction}>
               <Orbit size={17} /> 小都市
             </button>
-            <button className={state.action === "star" ? "selected" : ""} onClick={() => act({ type: "setAction", action: "star" })}>
+            <button className={`${state.action === "star" ? "selected" : ""} ${canStarAction ? "available" : "unavailable"}`} onClick={() => act({ type: "setAction", action: "star" })} disabled={!canStarAction}>
               <Satellite size={17} /> 大都市
             </button>
-            <button className={state.action === "criminal" ? "selected" : ""} onClick={() => act({ type: "setAction", action: "criminal" })}>
-              <Swords size={17} /> ラヴェジャーズ
+            <button className={canFrontierAction ? "available" : "unavailable"} onClick={() => act({ type: "buyDev" })} disabled={!canFrontierAction}>
+              <Shuffle size={17} /> 未知への旅
+            </button>
+            <button className={`${state.action === "trade" ? "selected" : ""} ${canTradeAction ? "available" : "unavailable"}`} onClick={() => act({ type: "setAction", action: "trade" })} disabled={!canTradeAction}>
+              <RadioTower size={17} /> 通信交易
             </button>
           </div>
 
           <div className="costs">
             <h2>建設コスト</h2>
-            <div className="buildOptions">
-              <BuildOption label="領界路" cost={COSTS.route} player={me} icon={Rocket} />
-              <BuildOption label="小都市" cost={COSTS.planet} player={me} icon={Orbit} />
-              <BuildOption label="大都市" cost={COSTS.star} player={me} icon={Satellite} />
-              <BuildOption label="未知への旅" cost={COSTS.frontier} player={me} icon={Shuffle} />
+            <div className="costTable">
+              <CostTableRow label="領界路" cost={COSTS.route} player={me} />
+              <CostTableRow label="小都市" cost={COSTS.planet} player={me} />
+              <CostTableRow label="大都市" cost={COSTS.star} player={me} />
+              <CostTableRow label="未知への旅" cost={COSTS.frontier} player={me} />
             </div>
-            <button onClick={() => act({ type: "buyDev" })} disabled={!mainActionable}>
-              <Shuffle size={17} /> 未知への旅を獲得
-            </button>
           </div>
 
+          {state.action === "trade" && (
           <div className="trade">
             <h2>通信交易 {currentTradeRate}:1</h2>
             <select value={trade.give} onChange={(e) => setTrade({ ...trade, give: e.target.value })}>
@@ -2610,37 +2788,11 @@ function App() {
             <button onClick={() => act({ type: "bankTrade", ...trade })} disabled={!mainActionable}>交換</button>
             <p className="spaceportNote">次元門: {spaceportText(state, myPlayerId)}</p>
           </div>
+          )}
 
           <CriminalPanel state={state} myPlayerId={myPlayerId} onEvent={act} />
 
           <NegotiationPanel state={state} myPlayerId={myPlayerId} onEvent={act} />
-
-          <div className="frontiers">
-            <h2>手札の未知への旅</h2>
-            <div className="miniControls">
-              <select value={devChoice.resource} onChange={(e) => setDevChoice({ ...devChoice, resource: e.target.value })}>
-                {RESOURCE_KEYS.map((key) => <option key={key} value={key}>押収: {RESOURCES[key].name}</option>)}
-              </select>
-              <select value={devChoice.a} onChange={(e) => setDevChoice({ ...devChoice, a: e.target.value })}>
-                {RESOURCE_KEYS.map((key) => <option key={key} value={key}>補給1: {RESOURCES[key].name}</option>)}
-              </select>
-              <select value={devChoice.b} onChange={(e) => setDevChoice({ ...devChoice, b: e.target.value })}>
-                {RESOURCE_KEYS.map((key) => <option key={key} value={key}>補給2: {RESOURCES[key].name}</option>)}
-              </select>
-            </div>
-            <div className="cards">
-              {me.hiddenNewFrontiers.map((card, index) => (
-                <button
-                  key={`${frontierType(card)}-${frontierBoughtTurn(card)}-${index}`}
-                  onClick={() => act({ type: "playDev", card: frontierType(card), ...devChoice })}
-                  disabled={!canPlayFrontier(card, state)}
-                >
-                  {DEV_NAMES[frontierType(card)]}{!canPlayFrontier(card, state) && frontierType(card) !== "point" ? " 次ターン" : ""}
-                </button>
-              ))}
-              {!me.hiddenNewFrontiers.length && <span className="muted">なし</span>}
-            </div>
-          </div>
 
           <HelpPanel />
         </aside>
@@ -2658,6 +2810,14 @@ function App() {
           Exit the Game
         </button>
       </section>
+      <FrontierUseDialog
+        pending={pendingFrontier}
+        choice={frontierChoice}
+        onChoiceChange={setFrontierChoice}
+        onConfirm={confirmFrontierUse}
+        onApply={applyFrontierUse}
+        onCancel={() => setPendingFrontier(null)}
+      />
     </main>
     </>
   );

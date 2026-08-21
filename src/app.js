@@ -62,11 +62,6 @@ var Shuffle = function Shuffle() {
     label: "\u21C4"
   });
 };
-var Swords = function Swords() {
-  return /*#__PURE__*/React.createElement(Icon, {
-    label: "!"
-  });
-};
 var Undo2 = function Undo2() {
   return /*#__PURE__*/React.createElement(Icon, {
     label: "\u2713"
@@ -87,43 +82,43 @@ var RESOURCES = {
     name: "レアメタル",
     terrain: "鉱物次元",
     color: "#a3544a",
-    icon: "assets/resources/raremetal.png"
+    icon: "assets/resources/raremetal.jpg"
   },
   rare: {
     name: "ナノマシン",
     terrain: "機械次元",
     color: "#64748b",
-    icon: "assets/resources/nanomachine.png"
+    icon: "assets/resources/nanomachine.jpg"
   },
   material: {
     name: "建材",
     terrain: "熱帯次元",
     color: "#2f855a",
-    icon: "assets/resources/building_materials.png"
+    icon: "assets/resources/building_materials.jpg"
   },
   nano: {
     name: "皮革",
     terrain: "大草原",
     color: "#7c9a3e",
-    icon: "assets/resources/leather.png"
+    icon: "assets/resources/leather.jpg"
   },
   food: {
     name: "穀物",
     terrain: "肥沃な大地",
     color: "#d5a11e",
-    icon: "assets/resources/food.png"
+    icon: "assets/resources/food.jpg"
   }
 };
 var RESOURCE_KEYS = Object.keys(RESOURCES);
 var TILE_IMAGES = {
-  rock: "assets/tiles/ore_dimension.png",
-  rare: "assets/tiles/machinery_dimension.png",
-  material: "assets/tiles/tropical_dimension.png",
-  nano: "assets/tiles/great_plains.png",
-  food: "assets/tiles/fertile_ground.png",
-  desert: "assets/tiles/void.png"
+  rock: "assets/tiles/ore_dimension.jpg",
+  rare: "assets/tiles/machinery_dimension.jpg",
+  material: "assets/tiles/tropical_dimension.jpg",
+  nano: "assets/tiles/great_plains.jpg",
+  food: "assets/tiles/fertile_ground.jpg",
+  desert: "assets/tiles/void.jpg"
 };
-var BOARD_BACKGROUND_IMAGE = "assets/board/universe.png";
+var BOARD_BACKGROUND_IMAGE = "assets/board/universe.jpg";
 var BGM_TRACK = "assets/audio/space_world.mp3";
 var BGM_STORAGE_KEY = "beyonders-bgm-enabled";
 var PLAYERS = [{
@@ -180,6 +175,14 @@ var DEV_NAMES = {
   plenty: "補給衛星",
   point: "勝利記録"
 };
+var DEV_IMAGES = {
+  tv: "assets/cards/tva.jpg",
+  route: "assets/cards/route_opening.jpg",
+  collect: "assets/cards/collect.jpg",
+  plenty: "assets/cards/supply_satellite.jpg",
+  point: "assets/cards/victory_record.jpg"
+};
+var DEV_DISPLAY_ORDER = ["tv", "route", "collect", "plenty", "point"];
 var FIXED_SPACEPORTS = [{
   tileNumber: 3,
   side: "upperLeft",
@@ -229,7 +232,8 @@ var BUILD_LABEL = {
   route: "領界路",
   planet: "小都市",
   star: "大都市",
-  frontier: "未知への旅"
+  frontier: "未知への旅",
+  trade: "通信交易"
 };
 var TILE_SETUP = ["material", "nano", "rock", "food", "rare", "rock", "food", "material", "nano", "desert", "material", "rare", "material", "food", "nano", "rock", "rare", "food", "nano"];
 // Number chips follow the familiar Catan spiral. The Void is randomized, and its
@@ -593,6 +597,13 @@ function canAfford(player, cost) {
       key = _ref8[0],
       amount = _ref8[1];
     return (player.resources[key] || 0) >= amount;
+  });
+}
+function canBankTradeWithAnyResource(state, playerId) {
+  var player = state.players[playerId];
+  if (!player) return false;
+  return RESOURCE_KEYS.some(function (key) {
+    return (player.resources[key] || 0) >= tradeRateFor(state, playerId, key);
   });
 }
 function pay(player, cost) {
@@ -1150,14 +1161,11 @@ function getVp(state, playerId) {
   var stars = Object.values(state.buildings).filter(function (b) {
     return b.player === playerId && b.type === "star";
   }).length;
-  var points = state.players[playerId].hiddenNewFrontiers.filter(function (card) {
-    return frontierType(card) === "point";
-  }).length;
   var publicPoints = (state.players[playerId].playedNewFrontiers || []).filter(function (card) {
     return card === "point";
   }).length;
   var bonus = (state.players[playerId].bonus.longest ? 2 : 0) + (state.players[playerId].bonus.largestTv ? 2 : 0);
-  return planets + stars * 2 + points + publicPoints + bonus;
+  return planets + stars * 2 + publicPoints + bonus;
 }
 function distanceRule(state, vertexId) {
   return !state.board.adjacency[vertexId].some(function (next) {
@@ -1851,23 +1859,15 @@ function Cost(_ref24) {
     }), RESOURCES[key].name, " ", value);
   }));
 }
-function BuildOption(_ref27) {
+function CostTableRow(_ref27) {
   var label = _ref27.label,
     cost = _ref27.cost,
-    player = _ref27.player,
-    IconComponent = _ref27.icon;
+    player = _ref27.player;
   var missing = missingCost(player, cost);
   var affordable = !Object.keys(missing).length;
-  return /*#__PURE__*/React.createElement("article", {
-    className: "buildOption ".concat(affordable ? "available" : "short")
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "buildOptionHead"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "buildOptionTitle"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "buildOptionIcon",
-    "aria-hidden": "true"
-  }, /*#__PURE__*/React.createElement(IconComponent, null)), /*#__PURE__*/React.createElement("strong", null, label))), /*#__PURE__*/React.createElement(Cost, {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "costRow ".concat(affordable ? "available" : "short")
+  }, /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement(Cost, {
     cost: cost,
     player: player
   }));
@@ -1921,14 +1921,162 @@ function ResourceBundleInput(_ref29) {
     }));
   }));
 }
+function canUseFrontierCard(card, state, player, mainActionable) {
+  return mainActionable && !state.negotiation && player.frontierPlayedTurn !== state.turnCount && canPlayFrontier(card, state);
+}
+function FrontierHand(_ref30) {
+  var player = _ref30.player,
+    state = _ref30.state,
+    mainActionable = _ref30.mainActionable,
+    onCardClick = _ref30.onCardClick;
+  var cards = player.hiddenNewFrontiers || [];
+  var grouped = DEV_DISPLAY_ORDER.map(function (type) {
+    return {
+      type: type,
+      cards: cards.map(function (card, index) {
+        return {
+          card: card,
+          index: index
+        };
+      }).filter(function (_ref31) {
+        var card = _ref31.card;
+        return frontierType(card) === type;
+      })
+    };
+  }).filter(function (group) {
+    return group.cards.length;
+  });
+  return /*#__PURE__*/React.createElement("section", {
+    className: "frontierShelf"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "frontierShelfHeader"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u6240\u6301\u30AB\u30FC\u30C9\u4E00\u89A7"), /*#__PURE__*/React.createElement("span", null, cards.length, "\u679A")), cards.length ? /*#__PURE__*/React.createElement("div", {
+    className: "frontierStacks"
+  }, grouped.map(function (group) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: group.type,
+      className: "frontierStack",
+      style: {
+        height: "".concat(156 + (group.cards.length - 1) * 30, "px")
+      }
+    }, group.cards.map(function (_ref32, stackIndex) {
+      var card = _ref32.card,
+        index = _ref32.index;
+      var usable = canUseFrontierCard(card, state, player, mainActionable);
+      return /*#__PURE__*/React.createElement("button", {
+        key: "".concat(group.type, "-").concat(frontierBoughtTurn(card), "-").concat(index),
+        className: "frontierCard ".concat(usable ? "usable" : "locked"),
+        style: {
+          "--stack-index": stackIndex
+        },
+        onClick: function onClick() {
+          return usable && onCardClick(card);
+        },
+        disabled: !usable,
+        title: DEV_NAMES[group.type]
+      }, /*#__PURE__*/React.createElement("img", {
+        src: DEV_IMAGES[group.type],
+        alt: DEV_NAMES[group.type]
+      }), /*#__PURE__*/React.createElement("span", null, DEV_NAMES[group.type]));
+    }));
+  })) : /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "\u306A\u3057"));
+}
+function ResourceChoiceButtons(_ref33) {
+  var value = _ref33.value,
+    onChange = _ref33.onChange;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "resourceChoiceButtons"
+  }, RESOURCE_KEYS.map(function (key) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: key,
+      type: "button",
+      className: value === key ? "selected" : "",
+      onClick: function onClick() {
+        return onChange(key);
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      className: "resourceIcon",
+      src: RESOURCES[key].icon,
+      alt: ""
+    }), RESOURCES[key].name);
+  }));
+}
+function FrontierUseDialog(_ref34) {
+  var pending = _ref34.pending,
+    choice = _ref34.choice,
+    onChoiceChange = _ref34.onChoiceChange,
+    onConfirm = _ref34.onConfirm,
+    onApply = _ref34.onApply,
+    onCancel = _ref34.onCancel;
+  if (!pending) return null;
+  var name = DEV_NAMES[pending.type];
+  var isChoiceStep = pending.step === "choice";
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modalBackdrop"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "frontierDialog"
+  }, /*#__PURE__*/React.createElement("img", {
+    className: "frontierDialogImage",
+    src: DEV_IMAGES[pending.type],
+    alt: name
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "frontierDialogBody"
+  }, /*#__PURE__*/React.createElement("h2", null, name), !isChoiceStep && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", null, "\u3053\u306E\u30AB\u30FC\u30C9\u3092\u4F7F\u7528\u3057\u307E\u3059\u304B?"), /*#__PURE__*/React.createElement("div", {
+    className: "dialogActions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onConfirm
+  }, "YES"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel
+  }, "NO"))), isChoiceStep && pending.type === "collect" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", null, "\u62BC\u53CE\u3059\u308B\u8CC7\u6750\u3092\u9078\u629E"), /*#__PURE__*/React.createElement(ResourceChoiceButtons, {
+    value: choice.resource,
+    onChange: function onChange(resource) {
+      return onChoiceChange(_objectSpread(_objectSpread({}, choice), {}, {
+        resource: resource
+      }));
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "dialogActions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onApply
+  }, "\u9069\u7528"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel
+  }, "NO"))), isChoiceStep && pending.type === "plenty" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", null, "\u53D7\u3051\u53D6\u308B\u8CC7\u6750\u30922\u3064\u9078\u629E"), /*#__PURE__*/React.createElement("div", {
+    className: "dualResourceChoice"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "1\u3064\u76EE"), /*#__PURE__*/React.createElement(ResourceChoiceButtons, {
+    value: choice.a,
+    onChange: function onChange(a) {
+      return onChoiceChange(_objectSpread(_objectSpread({}, choice), {}, {
+        a: a
+      }));
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "2\u3064\u76EE"), /*#__PURE__*/React.createElement(ResourceChoiceButtons, {
+    value: choice.b,
+    onChange: function onChange(b) {
+      return onChoiceChange(_objectSpread(_objectSpread({}, choice), {}, {
+        b: b
+      }));
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "dialogActions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "primary",
+    onClick: onApply
+  }, "\u9069\u7528"), /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel
+  }, "NO"))))));
+}
 function emptyBundle() {
   return emptyResources(0);
 }
-function NegotiationPanel(_ref30) {
+function NegotiationPanel(_ref35) {
   var _humanPartners$0$id, _humanPartners$, _state$players$select;
-  var state = _ref30.state,
-    myPlayerId = _ref30.myPlayerId,
-    onEvent = _ref30.onEvent;
+  var state = _ref35.state,
+    myPlayerId = _ref35.myPlayerId,
+    onEvent = _ref35.onEvent;
   var _useState = useState((myPlayerId + 1) % 4),
     _useState2 = _slicedToArray(_useState, 2),
     partnerId = _useState2[0],
@@ -2054,11 +2202,11 @@ function NegotiationPanel(_ref30) {
     }, line);
   }))));
 }
-function CriminalPanel(_ref31) {
+function CriminalPanel(_ref36) {
   var _state$pendingDiscard2;
-  var state = _ref31.state,
-    myPlayerId = _ref31.myPlayerId,
-    onEvent = _ref31.onEvent;
+  var state = _ref36.state,
+    myPlayerId = _ref36.myPlayerId,
+    onEvent = _ref36.onEvent;
   var _useState7 = useState(emptyBundle),
     _useState8 = _slicedToArray(_useState7, 2),
     discardBundle = _useState8[0],
@@ -2068,10 +2216,10 @@ function CriminalPanel(_ref31) {
     victimId = _useState0[0],
     setVictimId = _useState0[1];
   var need = Number(((_state$pendingDiscard2 = state.pendingDiscards) === null || _state$pendingDiscard2 === void 0 ? void 0 : _state$pendingDiscard2[myPlayerId]) || 0);
-  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref32) {
-    var _ref33 = _slicedToArray(_ref32, 2),
-      playerId = _ref33[0],
-      needCount = _ref33[1];
+  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref37) {
+    var _ref38 = _slicedToArray(_ref37, 2),
+      playerId = _ref38[0],
+      needCount = _ref38[1];
     return "".concat(state.players[playerId].name, ":").concat(needCount, "\u679A");
   });
   var pendingSteal = state.pendingSteal;
@@ -2205,8 +2353,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
   }
   function broadcastState(next) {
     var exceptConn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-    connections.current.forEach(function (_ref34) {
-      var c = _ref34.conn;
+    connections.current.forEach(function (_ref39) {
+      var c = _ref39.conn;
       return c !== exceptConn && c.open && c.send({
         type: "state",
         state: next
@@ -2401,8 +2549,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     var _peerRef$current, _peerRef$current$dest;
     suppressGuestCloseNotice.current = true;
     connections.current.forEach(function (item) {
-      var _close, _ref35;
-      return (_close = (_ref35 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref35);
+      var _close, _ref40;
+      return (_close = (_ref40 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref40);
     });
     connections.current = [];
     (_peerRef$current = peerRef.current) === null || _peerRef$current === void 0 || (_peerRef$current$dest = _peerRef$current.destroy) === null || _peerRef$current$dest === void 0 || _peerRef$current$dest.call(_peerRef$current);
@@ -2415,8 +2563,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     });
   }
   useEffect(function () {
-    if (net.mode === "host") connections.current.forEach(function (_ref36) {
-      var c = _ref36.conn;
+    if (net.mode === "host") connections.current.forEach(function (_ref41) {
+      var c = _ref41.conn;
       return c.open && c.send({
         type: "state",
         state: state
@@ -2462,11 +2610,11 @@ function roomIdFromInput(input) {
     return normalize(_params.get("join") || _params.get("host") || value);
   }
 }
-function HomeScreen(_ref37) {
-  var net = _ref37.net,
-    onCreate = _ref37.onCreate,
-    onJoin = _ref37.onJoin,
-    alert = _ref37.alert;
+function HomeScreen(_ref42) {
+  var net = _ref42.net,
+    onCreate = _ref42.onCreate,
+    onJoin = _ref42.onJoin,
+    alert = _ref42.alert;
   var _useState13 = useState(""),
     _useState14 = _slicedToArray(_useState13, 2),
     joinInput = _useState14[0],
@@ -2504,17 +2652,17 @@ function HomeScreen(_ref37) {
     className: "homeNote"
   }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
 }
-function LobbyScreen(_ref38) {
-  var state = _ref38.state,
-    myPlayerId = _ref38.myPlayerId,
-    net = _ref38.net,
-    onEvent = _ref38.onEvent,
-    onCopyInvite = _ref38.onCopyInvite,
-    onCopyRules = _ref38.onCopyRules,
-    copyStatus = _ref38.copyStatus,
-    onStartHuman = _ref38.onStartHuman,
-    onStartCpu = _ref38.onStartCpu,
-    onDissolveRoom = _ref38.onDissolveRoom;
+function LobbyScreen(_ref43) {
+  var state = _ref43.state,
+    myPlayerId = _ref43.myPlayerId,
+    net = _ref43.net,
+    onEvent = _ref43.onEvent,
+    onCopyInvite = _ref43.onCopyInvite,
+    onCopyRules = _ref43.onCopyRules,
+    copyStatus = _ref43.copyStatus,
+    onStartHuman = _ref43.onStartHuman,
+    onStartCpu = _ref43.onStartCpu,
+    onDissolveRoom = _ref43.onDissolveRoom;
   var readyCount = readyHumanCount(state);
   var ownReady = isReadyHuman(state.players[myPlayerId]);
   var isParent = isParentPlayer(myPlayerId);
@@ -2632,10 +2780,10 @@ function LobbyScreen(_ref38) {
     }, "kick"));
   })));
 }
-function Board(_ref39) {
-  var state = _ref39.state,
-    onEvent = _ref39.onEvent,
-    myPlayerId = _ref39.myPlayerId;
+function Board(_ref44) {
+  var state = _ref44.state,
+    onEvent = _ref44.onEvent,
+    myPlayerId = _ref44.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -2900,6 +3048,7 @@ function BgmControl() {
   }, enabled ? /*#__PURE__*/React.createElement(Music, null) : /*#__PURE__*/React.createElement(Muted, null), " BGM ", enabled ? "ON" : "OFF"));
 }
 function App() {
+  var _state$criminalMover2;
   var initialParams = useMemo(function () {
     return new URLSearchParams(location.hash.replace("#", ""));
   }, []);
@@ -2940,16 +3089,20 @@ function App() {
       b: "material"
     }),
     _useState26 = _slicedToArray(_useState25, 2),
-    devChoice = _useState26[0],
-    setDevChoice = _useState26[1];
-  var _useState27 = useState(""),
+    frontierChoice = _useState26[0],
+    setFrontierChoice = _useState26[1];
+  var _useState27 = useState(null),
     _useState28 = _slicedToArray(_useState27, 2),
-    copyStatus = _useState28[0],
-    setCopyStatus = _useState28[1];
+    pendingFrontier = _useState28[0],
+    setPendingFrontier = _useState28[1];
   var _useState29 = useState(""),
     _useState30 = _slicedToArray(_useState29, 2),
-    homeAlert = _useState30[0],
-    setHomeAlert = _useState30[1];
+    copyStatus = _useState30[0],
+    setCopyStatus = _useState30[1];
+  var _useState31 = useState(""),
+    _useState32 = _slicedToArray(_useState31, 2),
+    homeAlert = _useState32[0],
+    setHomeAlert = _useState32[1];
   var lastKickedAt = useRef(null);
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert, showHostDisconnectedAlert),
     net = _usePeerRoom.net,
@@ -3014,6 +3167,11 @@ function App() {
   var actionable = state.phase === "setup" ? state.orderLocked && active.id === myPlayerId : state.turn === myPlayerId;
   var mainActionable = actionable && isMainPhase(state);
   var currentTradeRate = tradeRateFor(state, myPlayerId, trade.give);
+  var canRouteAction = mainActionable && canAfford(me, COSTS.route);
+  var canPlanetAction = mainActionable && canAfford(me, COSTS.planet);
+  var canStarAction = mainActionable && canAfford(me, COSTS.star);
+  var canFrontierAction = mainActionable && canAfford(me, COSTS.frontier) && state.deck.length > 0;
+  var canTradeAction = mainActionable && canBankTradeWithAnyResource(state, myPlayerId);
   var selectablePlayers = state.players.filter(function (player) {
     return !player.isCpu || player.id === myPlayerId;
   });
@@ -3086,6 +3244,45 @@ function App() {
     setState(createGame(generateRoomId()));
     history.replaceState(null, "", location.pathname);
     showHomeAlert("ホストがゲームを終了しました。");
+  }
+  function selectFrontierCard(card) {
+    setPendingFrontier({
+      type: frontierType(card),
+      step: "confirm"
+    });
+  }
+  function confirmFrontierUse() {
+    if (!pendingFrontier) return;
+    if (["collect", "plenty"].includes(pendingFrontier.type)) {
+      setPendingFrontier(_objectSpread(_objectSpread({}, pendingFrontier), {}, {
+        step: "choice"
+      }));
+      return;
+    }
+    act({
+      type: "playDev",
+      card: pendingFrontier.type
+    });
+    setPendingFrontier(null);
+  }
+  function applyFrontierUse() {
+    if (!pendingFrontier) return;
+    if (pendingFrontier.type === "collect") {
+      act({
+        type: "playDev",
+        card: "collect",
+        resource: frontierChoice.resource
+      });
+    }
+    if (pendingFrontier.type === "plenty") {
+      act({
+        type: "playDev",
+        card: "plenty",
+        a: frontierChoice.a,
+        b: frontierChoice.b
+      });
+    }
+    setPendingFrontier(null);
   }
   function startHumanGame() {
     if (!isParentPlayer(myPlayerId) || net.mode === "guest") return;
@@ -3209,7 +3406,11 @@ function App() {
     className: "pill"
   }, "\u64CD\u4F5C: ", BUILD_LABEL[state.action] || (state.action === "criminal" ? "ラヴェジャーズ" : state.action === "discard" ? "資源廃棄" : state.action === "steal" ? "資源奪取" : state.action)), state.dice && /*#__PURE__*/React.createElement("span", {
     className: "pill"
-  }, "\u51FA\u76EE: ", state.dice.join(" + "), " = ", state.dice[0] + state.dice[1])), /*#__PURE__*/React.createElement(Board, {
+  }, "\u51FA\u76EE: ", state.dice.join(" + "), " = ", state.dice[0] + state.dice[1])), state.action === "criminal" && ((_state$criminalMover2 = state.criminalMover) !== null && _state$criminalMover2 !== void 0 ? _state$criminalMover2 : state.turn) === myPlayerId && /*#__PURE__*/React.createElement("div", {
+    className: "actionPrompt"
+  }, "RV\u306E\u79FB\u52D5\u5148\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044"), state.action === "freeRoute" && state.turn === myPlayerId && /*#__PURE__*/React.createElement("div", {
+    className: "actionPrompt"
+  }, "\u9818\u754C\u8DEF\u3092\u5EFA\u8A2D\u3057\u3066\u304F\u3060\u3055\u3044", state.freeRoutesLeft ? " \u3042\u3068".concat(state.freeRoutesLeft, "\u672C") : ""), /*#__PURE__*/React.createElement(Board, {
     state: state,
     onEvent: act,
     myPlayerId: myPlayerId
@@ -3229,6 +3430,11 @@ function App() {
     }, p.name, p.isCpu ? " BOT" : "");
   })))), /*#__PURE__*/React.createElement(ResourceHand, {
     player: me
+  }), /*#__PURE__*/React.createElement(FrontierHand, {
+    player: me,
+    state: state,
+    mainActionable: mainActionable,
+    onCardClick: selectFrontierCard
   }), /*#__PURE__*/React.createElement("div", {
     className: "actions"
   }, /*#__PURE__*/React.createElement("button", {
@@ -3253,79 +3459,80 @@ function App() {
   }), " \u30BF\u30FC\u30F3\u7D42\u4E86")), /*#__PURE__*/React.createElement("div", {
     className: "tools"
   }, /*#__PURE__*/React.createElement("button", {
-    className: state.action === "route" ? "selected" : "",
+    className: "".concat(state.action === "route" ? "selected" : "", " ").concat(canRouteAction ? "available" : "unavailable"),
     onClick: function onClick() {
       return act({
         type: "setAction",
         action: "route"
       });
-    }
+    },
+    disabled: !canRouteAction
   }, /*#__PURE__*/React.createElement(Rocket, {
     size: 17
   }), " \u9818\u754C\u8DEF"), /*#__PURE__*/React.createElement("button", {
-    className: state.action === "planet" ? "selected" : "",
+    className: "".concat(state.action === "planet" ? "selected" : "", " ").concat(canPlanetAction ? "available" : "unavailable"),
     onClick: function onClick() {
       return act({
         type: "setAction",
         action: "planet"
       });
-    }
+    },
+    disabled: !canPlanetAction
   }, /*#__PURE__*/React.createElement(Orbit, {
     size: 17
   }), " \u5C0F\u90FD\u5E02"), /*#__PURE__*/React.createElement("button", {
-    className: state.action === "star" ? "selected" : "",
+    className: "".concat(state.action === "star" ? "selected" : "", " ").concat(canStarAction ? "available" : "unavailable"),
     onClick: function onClick() {
       return act({
         type: "setAction",
         action: "star"
       });
-    }
+    },
+    disabled: !canStarAction
   }, /*#__PURE__*/React.createElement(Satellite, {
     size: 17
   }), " \u5927\u90FD\u5E02"), /*#__PURE__*/React.createElement("button", {
-    className: state.action === "criminal" ? "selected" : "",
-    onClick: function onClick() {
-      return act({
-        type: "setAction",
-        action: "criminal"
-      });
-    }
-  }, /*#__PURE__*/React.createElement(Swords, {
-    size: 17
-  }), " \u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA")), /*#__PURE__*/React.createElement("div", {
-    className: "costs"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u30B3\u30B9\u30C8"), /*#__PURE__*/React.createElement("div", {
-    className: "buildOptions"
-  }, /*#__PURE__*/React.createElement(BuildOption, {
-    label: "\u9818\u754C\u8DEF",
-    cost: COSTS.route,
-    player: me,
-    icon: Rocket
-  }), /*#__PURE__*/React.createElement(BuildOption, {
-    label: "\u5C0F\u90FD\u5E02",
-    cost: COSTS.planet,
-    player: me,
-    icon: Orbit
-  }), /*#__PURE__*/React.createElement(BuildOption, {
-    label: "\u5927\u90FD\u5E02",
-    cost: COSTS.star,
-    player: me,
-    icon: Satellite
-  }), /*#__PURE__*/React.createElement(BuildOption, {
-    label: "\u672A\u77E5\u3078\u306E\u65C5",
-    cost: COSTS.frontier,
-    player: me,
-    icon: Shuffle
-  })), /*#__PURE__*/React.createElement("button", {
+    className: canFrontierAction ? "available" : "unavailable",
     onClick: function onClick() {
       return act({
         type: "buyDev"
       });
     },
-    disabled: !mainActionable
+    disabled: !canFrontierAction
   }, /*#__PURE__*/React.createElement(Shuffle, {
     size: 17
-  }), " \u672A\u77E5\u3078\u306E\u65C5\u3092\u7372\u5F97")), /*#__PURE__*/React.createElement("div", {
+  }), " \u672A\u77E5\u3078\u306E\u65C5"), /*#__PURE__*/React.createElement("button", {
+    className: "".concat(state.action === "trade" ? "selected" : "", " ").concat(canTradeAction ? "available" : "unavailable"),
+    onClick: function onClick() {
+      return act({
+        type: "setAction",
+        action: "trade"
+      });
+    },
+    disabled: !canTradeAction
+  }, /*#__PURE__*/React.createElement(RadioTower, {
+    size: 17
+  }), " \u901A\u4FE1\u4EA4\u6613")), /*#__PURE__*/React.createElement("div", {
+    className: "costs"
+  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u30B3\u30B9\u30C8"), /*#__PURE__*/React.createElement("div", {
+    className: "costTable"
+  }, /*#__PURE__*/React.createElement(CostTableRow, {
+    label: "\u9818\u754C\u8DEF",
+    cost: COSTS.route,
+    player: me
+  }), /*#__PURE__*/React.createElement(CostTableRow, {
+    label: "\u5C0F\u90FD\u5E02",
+    cost: COSTS.planet,
+    player: me
+  }), /*#__PURE__*/React.createElement(CostTableRow, {
+    label: "\u5927\u90FD\u5E02",
+    cost: COSTS.star,
+    player: me
+  }), /*#__PURE__*/React.createElement(CostTableRow, {
+    label: "\u672A\u77E5\u3078\u306E\u65C5",
+    cost: COSTS.frontier,
+    player: me
+  }))), state.action === "trade" && /*#__PURE__*/React.createElement("div", {
     className: "trade"
   }, /*#__PURE__*/React.createElement("h2", null, "\u901A\u4FE1\u4EA4\u6613 ", currentTradeRate, ":1"), /*#__PURE__*/React.createElement("select", {
     value: trade.give,
@@ -3368,62 +3575,7 @@ function App() {
     state: state,
     myPlayerId: myPlayerId,
     onEvent: act
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "frontiers"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u624B\u672D\u306E\u672A\u77E5\u3078\u306E\u65C5"), /*#__PURE__*/React.createElement("div", {
-    className: "miniControls"
-  }, /*#__PURE__*/React.createElement("select", {
-    value: devChoice.resource,
-    onChange: function onChange(e) {
-      return setDevChoice(_objectSpread(_objectSpread({}, devChoice), {}, {
-        resource: e.target.value
-      }));
-    }
-  }, RESOURCE_KEYS.map(function (key) {
-    return /*#__PURE__*/React.createElement("option", {
-      key: key,
-      value: key
-    }, "\u62BC\u53CE: ", RESOURCES[key].name);
-  })), /*#__PURE__*/React.createElement("select", {
-    value: devChoice.a,
-    onChange: function onChange(e) {
-      return setDevChoice(_objectSpread(_objectSpread({}, devChoice), {}, {
-        a: e.target.value
-      }));
-    }
-  }, RESOURCE_KEYS.map(function (key) {
-    return /*#__PURE__*/React.createElement("option", {
-      key: key,
-      value: key
-    }, "\u88DC\u7D661: ", RESOURCES[key].name);
-  })), /*#__PURE__*/React.createElement("select", {
-    value: devChoice.b,
-    onChange: function onChange(e) {
-      return setDevChoice(_objectSpread(_objectSpread({}, devChoice), {}, {
-        b: e.target.value
-      }));
-    }
-  }, RESOURCE_KEYS.map(function (key) {
-    return /*#__PURE__*/React.createElement("option", {
-      key: key,
-      value: key
-    }, "\u88DC\u7D662: ", RESOURCES[key].name);
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "cards"
-  }, me.hiddenNewFrontiers.map(function (card, index) {
-    return /*#__PURE__*/React.createElement("button", {
-      key: "".concat(frontierType(card), "-").concat(frontierBoughtTurn(card), "-").concat(index),
-      onClick: function onClick() {
-        return act(_objectSpread({
-          type: "playDev",
-          card: frontierType(card)
-        }, devChoice));
-      },
-      disabled: !canPlayFrontier(card, state)
-    }, DEV_NAMES[frontierType(card)], !canPlayFrontier(card, state) && frontierType(card) !== "point" ? " 次ターン" : "");
-  }), !me.hiddenNewFrontiers.length && /*#__PURE__*/React.createElement("span", {
-    className: "muted"
-  }, "\u306A\u3057"))), /*#__PURE__*/React.createElement(HelpPanel, null))), /*#__PURE__*/React.createElement("section", {
+  }), /*#__PURE__*/React.createElement(HelpPanel, null))), /*#__PURE__*/React.createElement("section", {
     className: "log"
   }, /*#__PURE__*/React.createElement("h2", null, "\u822A\u884C\u30ED\u30B0"), state.winner !== null && /*#__PURE__*/React.createElement("div", {
     className: "winner"
@@ -3444,6 +3596,15 @@ function App() {
     className: "dangerButton",
     onClick: dissolveRoom,
     disabled: !isParentPlayer(myPlayerId) || net.mode === "guest"
-  }, "Exit the Game"))));
+  }, "Exit the Game")), /*#__PURE__*/React.createElement(FrontierUseDialog, {
+    pending: pendingFrontier,
+    choice: frontierChoice,
+    onChoiceChange: setFrontierChoice,
+    onConfirm: confirmFrontierUse,
+    onApply: applyFrontierUse,
+    onCancel: function onCancel() {
+      return setPendingFrontier(null);
+    }
+  })));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

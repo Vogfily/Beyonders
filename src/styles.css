@@ -28,7 +28,7 @@ body::after {
 
 body::before {
   z-index: 0;
-  background-image: url("../assets/board/home_universe.png");
+  background-image: url("../assets/board/home_universe.jpg");
   background-position: center;
   background-size: cover;
   transform: scale(1.16) translate3d(-3%, -2%, 0);
@@ -380,6 +380,18 @@ h2 {
   min-width: 0;
 }
 
+.actionPrompt {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 243, 168, 0.58);
+  border-radius: 8px;
+  color: #fff3a8;
+  background: rgba(63, 54, 20, 0.74);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  font-weight: 800;
+  text-align: center;
+}
+
 .statusLine {
   display: flex;
   flex-wrap: wrap;
@@ -403,6 +415,95 @@ h2 {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: #09111f;
+}
+
+.frontierShelf {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 18, 32, 0.76);
+}
+
+.frontierShelfHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.frontierShelfHeader h2 {
+  margin: 0;
+}
+
+.frontierShelfHeader span {
+  color: #bdd7e8;
+  font-size: 12px;
+}
+
+.frontierStacks {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-height: 156px;
+}
+
+.frontierStack {
+  position: relative;
+  width: 108px;
+  flex: 0 0 108px;
+}
+
+.frontierCard {
+  position: absolute;
+  top: calc(var(--stack-index) * 30px);
+  left: 0;
+  display: block;
+  width: 108px;
+  height: 150px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+}
+
+.frontierCard.usable {
+  border-color: rgba(110, 231, 242, 0.65);
+  box-shadow: 0 0 0 1px rgba(110, 231, 242, 0.18) inset, 0 16px 32px rgba(0, 0, 0, 0.36);
+}
+
+.frontierCard.locked {
+  opacity: 0.48;
+  filter: saturate(0.55) brightness(0.72);
+}
+
+.frontierCard img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.frontierCard span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  overflow: hidden;
+  padding: 4px 5px;
+  border-radius: 6px;
+  color: #f8fbff;
+  background: rgba(2, 6, 23, 0.78);
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hex {
@@ -587,6 +688,20 @@ h2 {
   grid-template-columns: 1fr 1fr;
 }
 
+.tools button.available {
+  border-color: rgba(110, 231, 242, 0.56);
+  color: #f8feff;
+  background: rgba(45, 212, 191, 0.16);
+  box-shadow: 0 0 0 1px rgba(110, 231, 242, 0.12) inset;
+}
+
+.tools button.unavailable {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #8491a8;
+  background: rgba(15, 23, 42, 0.52);
+  filter: saturate(0.55);
+}
+
 .tools .selected {
   outline: 2px solid #fff3a8;
   background: rgba(255, 243, 168, 0.16);
@@ -602,72 +717,41 @@ h2 {
   padding-top: 14px;
 }
 
-.buildOptions {
+.costTable {
   display: grid;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.buildOption {
-  display: grid;
-  gap: 7px;
-  padding: 10px;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.045);
 }
 
-.buildOption.available {
-  border-color: rgba(110, 231, 242, 0.62);
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.18), rgba(255, 255, 255, 0.06));
-  box-shadow: 0 0 0 1px rgba(110, 231, 242, 0.18) inset;
-}
-
-.buildOption.short {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(7, 17, 31, 0.42);
-}
-
-.buildOptionHead {
-  display: flex;
+.costRow {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
 }
 
-.buildOptionHead strong {
+.costRow + .costRow {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.costRow.available {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.costRow.short {
+  background: rgba(7, 17, 31, 0.34);
+}
+
+.costRow strong {
   color: #edf2ff;
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.buildOptionTitle {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-}
-
-.buildOptionIcon {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  color: #a5f3fc;
-  background: rgba(165, 243, 252, 0.12);
-}
-
-.buildOption.available .buildOptionIcon {
-  border-color: rgba(110, 231, 242, 0.72);
-  color: #07111f;
-  background: #a5f3fc;
-  box-shadow: 0 0 18px rgba(110, 231, 242, 0.28);
-}
-
-.buildOption.short .buildOptionIcon,
-.buildOption.short .buildOptionHead strong {
+.costRow.short strong {
   opacity: 0.48;
   filter: saturate(0.55);
 }
@@ -787,6 +871,95 @@ h2 {
   width: 54px;
   min-height: 30px;
   padding: 0 6px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.frontierDialog {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(12, 18, 32, 0.96);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.48);
+}
+
+.frontierDialogImage {
+  width: 150px;
+  height: 210px;
+  object-fit: cover;
+}
+
+.frontierDialogBody {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.frontierDialogBody h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.frontierDialogBody p {
+  color: #d8e8ff;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resourceChoiceButtons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.resourceChoiceButtons button {
+  display: grid;
+  min-width: 0;
+  min-height: 78px;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 6px;
+  font-size: 11px;
+}
+
+.resourceChoiceButtons button.selected {
+  border-color: #fff3a8;
+  color: #151515;
+  background: #fff3a8;
+}
+
+.dualResourceChoice {
+  display: grid;
+  gap: 12px;
+}
+
+.dualResourceChoice > div {
+  display: grid;
+  gap: 7px;
+}
+
+.dualResourceChoice strong {
+  color: #fff3a8;
+  font-size: 12px;
 }
 
 .currentOffer {
@@ -1062,5 +1235,18 @@ h2 {
 
   .bundleGrid {
     grid-template-columns: 1fr;
+  }
+
+  .frontierDialog {
+    grid-template-columns: 1fr;
+  }
+
+  .frontierDialogImage {
+    width: 100%;
+    height: 240px;
+  }
+
+  .resourceChoiceButtons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
