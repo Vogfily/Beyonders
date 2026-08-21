@@ -588,8 +588,78 @@ function createGame() {
     roomClosedAt: null,
     roomClosedReason: null,
     log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
-    winner: null
+    winner: null,
+    exitVotes: [],
+    testMode: false
   };
+}
+function createTestGame() {
+  var _state$board$vertices;
+  var state = createGame("111111");
+  state.testMode = true;
+  state.phase = "play";
+  state.turn = 0;
+  state.turnOrder = DEFAULT_TURN_ORDER;
+  state.orderLocked = true;
+  state.setupStep = state.setupOrder.length;
+  state.setupPendingVertex = null;
+  state.turnCount = 8;
+  state.turnStage = "main";
+  state.action = "build";
+  state.rolled = true;
+  state.dice = [3, 4];
+  state.deck = [].concat(_toConsumableArray(DEV_DECK), _toConsumableArray(DEV_DECK));
+  state.log = ["TESTMODE: Player Aのターンで固定されています。"];
+  state.players = state.players.map(function (player) {
+    return _objectSpread(_objectSpread({}, player), {}, {
+      joined: true,
+      clientId: null,
+      disconnectedAt: null,
+      kickedAt: null,
+      isCpu: player.id !== 0,
+      name: player.id === 0 ? "Player A" : "CPU ".concat(String.fromCharCode(65 + player.id)),
+      resources: emptyResources(player.id === 0 ? 5 : 3),
+      hiddenNewFrontiers: player.id === 0 ? DEV_DECK.map(function (type, index) {
+        return {
+          type: type,
+          boughtTurn: -1,
+          testIndex: index
+        };
+      }) : [],
+      playedNewFrontiers: [],
+      frontierPlayedTurn: null,
+      playedTv: 0,
+      bonus: {
+        longest: false,
+        largestTv: false
+      }
+    });
+  });
+  var seedVertex = (_state$board$vertices = state.board.vertices.filter(function (vertex) {
+    return distanceRule(state, vertex.id);
+  }).map(function (vertex) {
+    return {
+      id: vertex.id,
+      score: vertex.tiles.reduce(function (sum, tileId) {
+        var tile = state.board.tiles[tileId];
+        return sum + (tile.terrain === "desert" ? -2 : numberWeight(tile.number));
+      }, 0)
+    };
+  }).sort(function (a, b) {
+    return b.score - a.score;
+  })[0]) === null || _state$board$vertices === void 0 ? void 0 : _state$board$vertices.id;
+  if (seedVertex !== undefined) {
+    var _state$board$incident;
+    state.buildings[seedVertex] = {
+      player: 0,
+      type: "planet"
+    };
+    var seedEdge = (_state$board$incident = state.board.incidentEdges[seedVertex]) === null || _state$board$incident === void 0 ? void 0 : _state$board$incident[0];
+    if (seedEdge) state.routes[seedEdge] = {
+      player: 0
+    };
+  }
+  return state;
 }
 function canAfford(player, cost) {
   return Object.entries(cost).every(function (_ref7) {
@@ -680,6 +750,8 @@ function isCpuPlayer(state, playerId) {
   return Boolean((_state$players$player = state.players[playerId]) === null || _state$players$player === void 0 ? void 0 : _state$players$player.isCpu);
 }
 function phaseLabel(state) {
+  if (state.winner !== null) return "ゲーム終了";
+  if (state.testMode) return "TESTMODE";
   if (state.phase === "setup" && !state.orderLocked) return "順番決定待ち";
   if (state.phase === "setup") return "初期配置";
   if (state.turnStage === "roll") return "サイコロ";
@@ -709,6 +781,21 @@ function sanitizePlayerName(name) {
 }
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
+}
+function exitVoteSet(state) {
+  var votes = new Set(state.exitVotes || []);
+  if (state.winner !== null) {
+    state.players.forEach(function (player) {
+      if (player.isCpu) votes.add(player.id);
+    });
+  }
+  return votes;
+}
+function exitVoteCount(state) {
+  return exitVoteSet(state).size;
+}
+function hasExitVoted(state, playerId) {
+  return exitVoteSet(state).has(playerId);
 }
 function numberWeight(number) {
   return {
@@ -756,8 +843,8 @@ function vertexScore(state, vertexId, playerId) {
   return score;
 }
 function bestPlanetVertex(state, playerId) {
-  var _state$board$vertices;
-  return ((_state$board$vertices = state.board.vertices.filter(function (vertex) {
+  var _state$board$vertices2;
+  return ((_state$board$vertices2 = state.board.vertices.filter(function (vertex) {
     return canBuildPlanet(state, vertex.id, playerId);
   }).map(function (vertex) {
     return {
@@ -766,11 +853,11 @@ function bestPlanetVertex(state, playerId) {
     };
   }).sort(function (a, b) {
     return b.score - a.score;
-  })[0]) === null || _state$board$vertices === void 0 ? void 0 : _state$board$vertices.id) || null;
+  })[0]) === null || _state$board$vertices2 === void 0 ? void 0 : _state$board$vertices2.id) || null;
 }
 function bestStarVertex(state, playerId) {
-  var _state$board$vertices2;
-  return ((_state$board$vertices2 = state.board.vertices.filter(function (vertex) {
+  var _state$board$vertices3;
+  return ((_state$board$vertices3 = state.board.vertices.filter(function (vertex) {
     var _state$buildings$vert2, _state$buildings$vert3;
     return ((_state$buildings$vert2 = state.buildings[vertex.id]) === null || _state$buildings$vert2 === void 0 ? void 0 : _state$buildings$vert2.player) === playerId && ((_state$buildings$vert3 = state.buildings[vertex.id]) === null || _state$buildings$vert3 === void 0 ? void 0 : _state$buildings$vert3.type) === "planet";
   }).map(function (vertex) {
@@ -780,7 +867,7 @@ function bestStarVertex(state, playerId) {
     };
   }).sort(function (a, b) {
     return b.score - a.score;
-  })[0]) === null || _state$board$vertices2 === void 0 ? void 0 : _state$board$vertices2.id) || null;
+  })[0]) === null || _state$board$vertices3 === void 0 ? void 0 : _state$board$vertices3.id) || null;
 }
 function bestRouteEdge(state, playerId) {
   var _state$board$edges$fi;
@@ -1313,6 +1400,35 @@ function refreshBonuses(state) {
     });
   }
 }
+function addCpuExitVotes(state) {
+  var votes = exitVoteSet(state);
+  state.players.forEach(function (player) {
+    if (player.isCpu) votes.add(player.id);
+  });
+  state.exitVotes = _toConsumableArray(votes).sort(function (a, b) {
+    return a - b;
+  });
+}
+function finishVictoryIfNeeded(state) {
+  if (state.winner !== null) {
+    addCpuExitVotes(state);
+    return true;
+  }
+  var winner = state.players.find(function (player) {
+    return getVp(state, player.id) >= 10;
+  });
+  if (!winner) return false;
+  state.winner = winner.id;
+  state.turnStage = "ended";
+  state.action = "ended";
+  state.negotiation = null;
+  state.pendingDiscards = {};
+  state.pendingSteal = null;
+  state.criminalMover = null;
+  addCpuExitVotes(state);
+  addLog(state, "".concat(winner.name, " \u304C10VP\u306B\u5230\u9054\u3057\u307E\u3057\u305F\u3002"));
+  return true;
+}
 function produce(state, total) {
   state.turnStage = "production";
   if (total === 7) {
@@ -1349,12 +1465,15 @@ function produce(state, total) {
 }
 function moveTurn(state) {
   refreshBonuses(state);
-  var winner = state.players.find(function (player) {
-    return getVp(state, player.id) >= 10;
-  });
-  if (winner) {
-    state.winner = winner.id;
-    addLog(state, "".concat(winner.name, " \u304C10\u70B9\u306B\u5230\u9054\u3057\u307E\u3057\u305F\u3002"));
+  if (finishVictoryIfNeeded(state)) return;
+  if (state.testMode) {
+    state.turn = 0;
+    state.turnCount = (state.turnCount || 0) + 1;
+    state.rolled = true;
+    state.dice = [3, 4];
+    state.turnStage = "main";
+    state.action = "build";
+    addLog(state, "TESTMODE: Player Aのターンを継続します。");
     return;
   }
   var order = state.turnOrder || [0, 1, 2, 3];
@@ -1372,8 +1491,23 @@ function reducer(state, event) {
   var next = structuredClone(state);
   var actor = (_event$playerId = event.playerId) !== null && _event$playerId !== void 0 ? _event$playerId : currentPlayer(next).id;
   var player = next.players[actor];
-  if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
+  if (next.winner && !["reset", "dissolveRoom", "victoryExit", "disconnectPlayer"].includes(event.type)) return next;
   if (event.type === "reset") return createGame(event.roomId || generateRoomId());
+  if (event.type === "victoryExit") {
+    if (next.winner === null || !player) return next;
+    var before = exitVoteCount(next);
+    var votes = exitVoteSet(next);
+    votes.add(actor);
+    next.exitVotes = _toConsumableArray(votes).sort(function (a, b) {
+      return a - b;
+    });
+    if (exitVoteCount(next) > before) addLog(next, "".concat(player.name, " \u304CEXIT THE GAME\u3092\u62BC\u3057\u307E\u3057\u305F\u3002"));
+    if (exitVoteCount(next) >= 4) {
+      next.roomClosedAt = Date.now();
+      next.roomClosedReason = "victoryExit";
+    }
+    return next;
+  }
   if (event.type === "dissolveRoom") {
     if (!isParentPlayer(actor)) return next;
     next.roomClosedAt = Date.now();
@@ -1437,6 +1571,14 @@ function reducer(state, event) {
     disconnected.disconnectedAt = Date.now();
     next.negotiation = null;
     addLog(next, "".concat(disconnected.name, " \u304C\u5207\u65AD\u3055\u308C\u3001BOT\u306B\u4EA4\u4EE3\u3057\u307E\u3057\u305F\u3002"));
+    if (next.winner !== null) {
+      addCpuExitVotes(next);
+      if (exitVoteCount(next) >= 4) {
+        next.roomClosedAt = Date.now();
+        next.roomClosedReason = "victoryExit";
+      }
+      return next;
+    }
     if (next.phase === "play" && next.turn === disconnectedId) {
       addLog(next, "".concat(disconnected.name, " \u306E\u30BF\u30FC\u30F3\u3092\u7D42\u4E86\u3057\u307E\u3059\u3002"));
       moveTurn(next);
@@ -1512,6 +1654,12 @@ function reducer(state, event) {
     if (["discard", "steal"].includes(next.action)) return next;
     if (next.phase === "setup" && !next.orderLocked) return next;
     next.action = event.action;
+    return next;
+  }
+  if (event.type === "testAdjustResource") {
+    if (!next.testMode || actor !== 0 || !RESOURCE_KEYS.includes(event.resource)) return next;
+    var delta = Number(event.amount || 0);
+    player.resources[event.resource] = Math.max(0, Math.min(99, (player.resources[event.resource] || 0) + delta));
     return next;
   }
   if (event.type === "selectTile") {
@@ -1602,6 +1750,7 @@ function reducer(state, event) {
       }
     }
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "edge") {
@@ -1648,6 +1797,7 @@ function reducer(state, event) {
     }
     addLog(next, "".concat(player.name, " \u304C\u9818\u754C\u8DEF\u3092\u5EFA\u8A2D\u3057\u307E\u3057\u305F\u3002"));
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "buyDev") {
@@ -1662,16 +1812,16 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "playDev") {
-    if (player.frontierPlayedTurn === next.turnCount) return next;
+    if (!next.testMode && player.frontierPlayedTurn === next.turnCount) return next;
     var cardIndex = player.hiddenNewFrontiers.findIndex(function (card) {
-      return frontierType(card) === event.card && canPlayFrontier(card, next);
+      return frontierType(card) === event.card && (next.testMode || canPlayFrontier(card, next));
     });
     if (actor !== next.turn || !isMainPhase(next) || cardIndex < 0) return next;
     var _card = player.hiddenNewFrontiers.splice(cardIndex, 1)[0];
     var type = frontierType(_card);
     player.playedNewFrontiers = player.playedNewFrontiers || [];
     player.playedNewFrontiers.push(type);
-    player.frontierPlayedTurn = next.turnCount;
+    if (!next.testMode) player.frontierPlayedTurn = next.turnCount;
     next.discard.push(type);
     if (type === "point") {
       addLog(next, "".concat(player.name, " \u304C\u52DD\u5229\u8A18\u9332\u3092\u516C\u958B\u3057\u307E\u3057\u305F\u3002"));
@@ -1703,6 +1853,7 @@ function reducer(state, event) {
       addLog(next, "".concat(player.name, " \u304C\u88DC\u7D66\u885B\u661F\u304B\u3089\u8CC7\u6E90\u3092\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\u3002"));
     }
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "bankTrade") {
@@ -1873,7 +2024,10 @@ function CostTableRow(_ref27) {
   }));
 }
 function ResourceHand(_ref28) {
-  var player = _ref28.player;
+  var player = _ref28.player,
+    _ref28$testMode = _ref28.testMode,
+    testMode = _ref28$testMode === void 0 ? false : _ref28$testMode,
+    onAdjustResource = _ref28.onAdjustResource;
   var total = totalResources(player.resources);
   return /*#__PURE__*/React.createElement("div", {
     className: "resourceHand"
@@ -1882,6 +2036,7 @@ function ResourceHand(_ref28) {
   }, /*#__PURE__*/React.createElement("h2", null, "\u6240\u6301\u8CC7\u6E90"), /*#__PURE__*/React.createElement("span", null, total, "\u679A")), /*#__PURE__*/React.createElement("div", {
     className: "resourceTiles"
   }, RESOURCE_KEYS.map(function (key) {
+    var amount = player.resources[key] || 0;
     return /*#__PURE__*/React.createElement("div", {
       key: key,
       className: "resourceTile",
@@ -1894,7 +2049,22 @@ function ResourceHand(_ref28) {
       className: "resourceIcon",
       src: RESOURCES[key].icon,
       alt: ""
-    }), RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
+    }), RESOURCES[key].name), /*#__PURE__*/React.createElement("div", {
+      className: "resourceAmount ".concat(testMode ? "testControls" : "plain")
+    }, testMode && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "resourceAdjust",
+      onClick: function onClick() {
+        return onAdjustResource === null || onAdjustResource === void 0 ? void 0 : onAdjustResource(key, -1);
+      },
+      disabled: amount <= 0
+    }, "-"), /*#__PURE__*/React.createElement("strong", null, amount), testMode && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "resourceAdjust",
+      onClick: function onClick() {
+        return onAdjustResource === null || onAdjustResource === void 0 ? void 0 : onAdjustResource(key, 1);
+      }
+    }, "+")), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
   })));
 }
 function ResourceBundleInput(_ref29) {
@@ -1922,7 +2092,7 @@ function ResourceBundleInput(_ref29) {
   }));
 }
 function canUseFrontierCard(card, state, player, mainActionable) {
-  return mainActionable && !state.negotiation && player.frontierPlayedTurn !== state.turnCount && canPlayFrontier(card, state);
+  return mainActionable && !state.negotiation && (state.testMode || player.frontierPlayedTurn !== state.turnCount) && (state.testMode || canPlayFrontier(card, state));
 }
 function FrontierHand(_ref30) {
   var player = _ref30.player,
@@ -2614,12 +2784,15 @@ function HomeScreen(_ref42) {
   var net = _ref42.net,
     onCreate = _ref42.onCreate,
     onJoin = _ref42.onJoin,
+    onTestMode = _ref42.onTestMode,
     alert = _ref42.alert;
   var _useState13 = useState(""),
     _useState14 = _slicedToArray(_useState13, 2),
     joinInput = _useState14[0],
     setJoinInput = _useState14[1];
-  var canJoin = ["POPUP1", "POPUP2", "POPUP3"].includes(joinInput.trim()) || Boolean(roomIdFromInput(joinInput));
+  var normalizedJoinInput = joinInput.trim().toUpperCase();
+  var isTestMode = normalizedJoinInput === "TESTMODE";
+  var canJoin = isTestMode || ["POPUP1", "POPUP2", "POPUP3"].includes(joinInput.trim()) || Boolean(roomIdFromInput(joinInput));
   return /*#__PURE__*/React.createElement("main", {
     className: "homeMain"
   }, alert && /*#__PURE__*/React.createElement("div", {
@@ -2643,9 +2816,9 @@ function HomeScreen(_ref42) {
   }), /*#__PURE__*/React.createElement("button", {
     className: "homeButton",
     onClick: function onClick() {
-      return onJoin(joinInput);
+      return isTestMode ? onTestMode() : onJoin(joinInput);
     },
-    disabled: !canJoin || !window.Peer
+    disabled: !canJoin || !isTestMode && !window.Peer
   }, /*#__PURE__*/React.createElement(Orbit, {
     size: 18
   }), " \u90E8\u5C4B\u306B\u53C2\u52A0"))), /*#__PURE__*/React.createElement("section", {
@@ -2785,7 +2958,7 @@ function Board(_ref44) {
     onEvent = _ref44.onEvent,
     myPlayerId = _ref44.myPlayerId;
   var active = currentPlayer(state).id;
-  var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
+  var canClick = state.winner === null && (state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId);
   return /*#__PURE__*/React.createElement("svg", {
     viewBox: "0 0 720 680",
     className: "board",
@@ -3047,6 +3220,15 @@ function BgmControl() {
     "aria-label": enabled ? "BGMを停止" : "BGMを再生"
   }, enabled ? /*#__PURE__*/React.createElement(Music, null) : /*#__PURE__*/React.createElement(Muted, null), " BGM ", enabled ? "ON" : "OFF"));
 }
+function WinFlash(_ref45) {
+  var playerName = _ref45.playerName;
+  if (!playerName) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "winFlash",
+    role: "status",
+    "aria-live": "assertive"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, playerName), /*#__PURE__*/React.createElement("span", null, "WIN!")));
+}
 function App() {
   var _state$criminalMover2;
   var initialParams = useMemo(function () {
@@ -3103,7 +3285,12 @@ function App() {
     _useState32 = _slicedToArray(_useState31, 2),
     homeAlert = _useState32[0],
     setHomeAlert = _useState32[1];
+  var _useState33 = useState(null),
+    _useState34 = _slicedToArray(_useState33, 2),
+    winFlash = _useState34[0],
+    setWinFlash = _useState34[1];
   var lastKickedAt = useRef(null);
+  var lastWinnerRef = useRef(null);
   var _usePeerRoom = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert, showHostDisconnectedAlert),
     net = _usePeerRoom.net,
     host = _usePeerRoom.host,
@@ -3131,10 +3318,27 @@ function App() {
     history.replaceState(null, "", location.pathname);
     if (reason === "hostDisconnected") {
       showHomeAlert("ホストが退出したため、ゲームが終了されました。");
-    } else if (!isParentPlayer(myPlayerId)) {
+    } else if (reason === "hostExit" && !isParentPlayer(myPlayerId)) {
       showHomeAlert("ホストがゲームを終了しました。");
     }
   }, [state.roomClosedAt]);
+  useEffect(function () {
+    var _state$players$state$;
+    if (state.winner === null) {
+      lastWinnerRef.current = null;
+      setWinFlash(null);
+      return;
+    }
+    if (lastWinnerRef.current === state.winner) return;
+    lastWinnerRef.current = state.winner;
+    setWinFlash(((_state$players$state$ = state.players[state.winner]) === null || _state$players$state$ === void 0 ? void 0 : _state$players$state$.name) || "PLAYER");
+    var timer = window.setTimeout(function () {
+      return setWinFlash(null);
+    }, 1500);
+    return function () {
+      return window.clearTimeout(timer);
+    };
+  }, [state.winner]);
   useEffect(function () {
     var _state$players$myPlay;
     var kickedAt = (_state$players$myPlay = state.players[myPlayerId]) === null || _state$players$myPlay === void 0 ? void 0 : _state$players$myPlay.kickedAt;
@@ -3179,6 +3383,8 @@ function App() {
     return state.players[id].name;
   }).join(" → ");
   var shareUrl = net.share || location.href;
+  var victoryExitCount = exitVoteCount(state);
+  var victoryExitVoted = hasExitVoted(state, myPlayerId);
   function copyToClipboard(text, label) {
     if (!navigator.clipboard) {
       setCopyStatus("コピー機能が使えません");
@@ -3220,6 +3426,13 @@ function App() {
     if (!roomId) return;
     join(roomId);
     setScreen("lobby");
+  }
+  function startTestMode() {
+    closeNetwork();
+    setState(createTestGame());
+    setMyPlayerId(0);
+    setScreen("game");
+    history.replaceState(null, "", location.pathname);
   }
   function showHomeAlert(text) {
     setHomeAlert(text);
@@ -3312,11 +3525,28 @@ function App() {
       reason: "hostExit"
     });
   }
+  function exitGame() {
+    if (state.winner !== null) {
+      act({
+        type: "victoryExit"
+      });
+      return;
+    }
+    dissolveRoom();
+  }
+  function adjustTestResource(resource, amount) {
+    act({
+      type: "testAdjustResource",
+      resource: resource,
+      amount: amount
+    });
+  }
   if (screen === "home") {
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement(HomeScreen, {
       net: net,
       onCreate: createRoomFromHome,
       onJoin: joinRoomFromHome,
+      onTestMode: startTestMode,
       alert: homeAlert
     }));
   }
@@ -3338,7 +3568,9 @@ function App() {
       onDissolveRoom: dissolveRoom
     }));
   }
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BgmControl, null), /*#__PURE__*/React.createElement(WinFlash, {
+    playerName: winFlash
+  }), /*#__PURE__*/React.createElement("main", null, /*#__PURE__*/React.createElement("section", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", null, "Beyonders"), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02\u3092\u5E83\u3052\u3001\u5927\u90FD\u5E02\u3078\u80B2\u3066\u300110\u70B9\u3092\u76EE\u6307\u30594\u4EBA\u7528\u30AA\u30F3\u30E9\u30A4\u30F3\u5353\u3002")), /*#__PURE__*/React.createElement("div", {
     className: "net"
@@ -3380,8 +3612,10 @@ function App() {
       style: {
         "--player": player.color
       },
-      className: player.id === active.id ? "active" : ""
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, player.isCpu && /*#__PURE__*/React.createElement("span", {
+      className: "".concat(player.id === active.id ? "active" : "", " ").concat(state.winner === player.id ? "winnerPlayer" : "")
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, player.name, state.winner === player.id && /*#__PURE__*/React.createElement("span", {
+      className: "winnerBadge"
+    }, "WIN!"), player.isCpu && /*#__PURE__*/React.createElement("span", {
       className: "badge cpuBadge"
     }, "BOT"), player.bonus.longest && /*#__PURE__*/React.createElement("span", {
       className: "badge"
@@ -3429,7 +3663,9 @@ function App() {
       value: p.id
     }, p.name, p.isCpu ? " BOT" : "");
   })))), /*#__PURE__*/React.createElement(ResourceHand, {
-    player: me
+    player: me,
+    testMode: state.testMode,
+    onAdjustResource: adjustTestResource
   }), /*#__PURE__*/React.createElement(FrontierHand, {
     player: me,
     state: state,
@@ -3592,11 +3828,13 @@ function App() {
     }, line);
   })), /*#__PURE__*/React.createElement("section", {
     className: "exitGame"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, state.winner !== null && /*#__PURE__*/React.createElement("div", {
+    className: "exitVoteCount"
+  }, victoryExitCount, " / 4"), /*#__PURE__*/React.createElement("button", {
     className: "dangerButton",
-    onClick: dissolveRoom,
-    disabled: !isParentPlayer(myPlayerId) || net.mode === "guest"
-  }, "Exit the Game")), /*#__PURE__*/React.createElement(FrontierUseDialog, {
+    onClick: exitGame,
+    disabled: state.winner !== null ? victoryExitVoted : !isParentPlayer(myPlayerId) || net.mode === "guest"
+  }, state.winner !== null && victoryExitVoted ? "EXIT RECORDED" : "EXIT THE GAME")), /*#__PURE__*/React.createElement(FrontierUseDialog, {
     pending: pendingFrontier,
     choice: frontierChoice,
     onChoiceChange: setFrontierChoice,

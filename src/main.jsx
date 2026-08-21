@@ -451,7 +451,59 @@ function createGame(roomId = generateRoomId()) {
     roomClosedReason: null,
     log: ["参加者を確認し、順番を決定してから初期配置を開始してください。"],
     winner: null,
+    exitVotes: [],
+    testMode: false,
   };
+}
+
+function createTestGame() {
+  const state = createGame("111111");
+  state.testMode = true;
+  state.phase = "play";
+  state.turn = 0;
+  state.turnOrder = DEFAULT_TURN_ORDER;
+  state.orderLocked = true;
+  state.setupStep = state.setupOrder.length;
+  state.setupPendingVertex = null;
+  state.turnCount = 8;
+  state.turnStage = "main";
+  state.action = "build";
+  state.rolled = true;
+  state.dice = [3, 4];
+  state.deck = [...DEV_DECK, ...DEV_DECK];
+  state.log = ["TESTMODE: Player Aのターンで固定されています。"];
+  state.players = state.players.map((player) => ({
+    ...player,
+    joined: true,
+    clientId: null,
+    disconnectedAt: null,
+    kickedAt: null,
+    isCpu: player.id !== 0,
+    name: player.id === 0 ? "Player A" : `CPU ${String.fromCharCode(65 + player.id)}`,
+    resources: emptyResources(player.id === 0 ? 5 : 3),
+    hiddenNewFrontiers: player.id === 0 ? DEV_DECK.map((type, index) => ({ type, boughtTurn: -1, testIndex: index })) : [],
+    playedNewFrontiers: [],
+    frontierPlayedTurn: null,
+    playedTv: 0,
+    bonus: { longest: false, largestTv: false },
+  }));
+
+  const seedVertex = state.board.vertices
+    .filter((vertex) => distanceRule(state, vertex.id))
+    .map((vertex) => ({
+      id: vertex.id,
+      score: vertex.tiles.reduce((sum, tileId) => {
+        const tile = state.board.tiles[tileId];
+        return sum + (tile.terrain === "desert" ? -2 : numberWeight(tile.number));
+      }, 0),
+    }))
+    .sort((a, b) => b.score - a.score)[0]?.id;
+  if (seedVertex !== undefined) {
+    state.buildings[seedVertex] = { player: 0, type: "planet" };
+    const seedEdge = state.board.incidentEdges[seedVertex]?.[0];
+    if (seedEdge) state.routes[seedEdge] = { player: 0 };
+  }
+  return state;
 }
 
 function canAfford(player, cost) {
@@ -530,6 +582,8 @@ function isCpuPlayer(state, playerId) {
 }
 
 function phaseLabel(state) {
+  if (state.winner !== null) return "ゲーム終了";
+  if (state.testMode) return "TESTMODE";
   if (state.phase === "setup" && !state.orderLocked) return "順番決定待ち";
   if (state.phase === "setup") return "初期配置";
   if (state.turnStage === "roll") return "サイコロ";
@@ -575,6 +629,24 @@ function sanitizePlayerName(name) {
 
 function isMainPhase(state) {
   return state.phase === "play" && state.turnStage === "main";
+}
+
+function exitVoteSet(state) {
+  const votes = new Set(state.exitVotes || []);
+  if (state.winner !== null) {
+    state.players.forEach((player) => {
+      if (player.isCpu) votes.add(player.id);
+    });
+  }
+  return votes;
+}
+
+function exitVoteCount(state) {
+  return exitVoteSet(state).size;
+}
+
+function hasExitVoted(state, playerId) {
+  return exitVoteSet(state).has(playerId);
 }
 
 function numberWeight(number) {
@@ -933,6 +1005,33 @@ function refreshBonuses(state) {
   }
 }
 
+function addCpuExitVotes(state) {
+  const votes = exitVoteSet(state);
+  state.players.forEach((player) => {
+    if (player.isCpu) votes.add(player.id);
+  });
+  state.exitVotes = [...votes].sort((a, b) => a - b);
+}
+
+function finishVictoryIfNeeded(state) {
+  if (state.winner !== null) {
+    addCpuExitVotes(state);
+    return true;
+  }
+  const winner = state.players.find((player) => getVp(state, player.id) >= 10);
+  if (!winner) return false;
+  state.winner = winner.id;
+  state.turnStage = "ended";
+  state.action = "ended";
+  state.negotiation = null;
+  state.pendingDiscards = {};
+  state.pendingSteal = null;
+  state.criminalMover = null;
+  addCpuExitVotes(state);
+  addLog(state, `${winner.name} が10VPに到達しました。`);
+  return true;
+}
+
 function produce(state, total) {
   state.turnStage = "production";
   if (total === 7) {
@@ -968,10 +1067,15 @@ function produce(state, total) {
 
 function moveTurn(state) {
   refreshBonuses(state);
-  const winner = state.players.find((player) => getVp(state, player.id) >= 10);
-  if (winner) {
-    state.winner = winner.id;
-    addLog(state, `${winner.name} が10点に到達しました。`);
+  if (finishVictoryIfNeeded(state)) return;
+  if (state.testMode) {
+    state.turn = 0;
+    state.turnCount = (state.turnCount || 0) + 1;
+    state.rolled = true;
+    state.dice = [3, 4];
+    state.turnStage = "main";
+    state.action = "build";
+    addLog(state, "TESTMODE: Player Aのターンを継続します。");
     return;
   }
   const order = state.turnOrder || [0, 1, 2, 3];
@@ -989,9 +1093,22 @@ function reducer(state, event) {
   const next = structuredClone(state);
   const actor = event.playerId ?? currentPlayer(next).id;
   const player = next.players[actor];
-  if (next.winner && !["reset", "dissolveRoom"].includes(event.type)) return next;
+  if (next.winner && !["reset", "dissolveRoom", "victoryExit", "disconnectPlayer"].includes(event.type)) return next;
 
   if (event.type === "reset") return createGame(event.roomId || generateRoomId());
+  if (event.type === "victoryExit") {
+    if (next.winner === null || !player) return next;
+    const before = exitVoteCount(next);
+    const votes = exitVoteSet(next);
+    votes.add(actor);
+    next.exitVotes = [...votes].sort((a, b) => a - b);
+    if (exitVoteCount(next) > before) addLog(next, `${player.name} がEXIT THE GAMEを押しました。`);
+    if (exitVoteCount(next) >= 4) {
+      next.roomClosedAt = Date.now();
+      next.roomClosedReason = "victoryExit";
+    }
+    return next;
+  }
   if (event.type === "dissolveRoom") {
     if (!isParentPlayer(actor)) return next;
     next.roomClosedAt = Date.now();
@@ -1051,6 +1168,14 @@ function reducer(state, event) {
     disconnected.disconnectedAt = Date.now();
     next.negotiation = null;
     addLog(next, `${disconnected.name} が切断され、BOTに交代しました。`);
+    if (next.winner !== null) {
+      addCpuExitVotes(next);
+      if (exitVoteCount(next) >= 4) {
+        next.roomClosedAt = Date.now();
+        next.roomClosedReason = "victoryExit";
+      }
+      return next;
+    }
     if (next.phase === "play" && next.turn === disconnectedId) {
       addLog(next, `${disconnected.name} のターンを終了します。`);
       moveTurn(next);
@@ -1121,6 +1246,12 @@ function reducer(state, event) {
     if (["discard", "steal"].includes(next.action)) return next;
     if (next.phase === "setup" && !next.orderLocked) return next;
     next.action = event.action;
+    return next;
+  }
+  if (event.type === "testAdjustResource") {
+    if (!next.testMode || actor !== 0 || !RESOURCE_KEYS.includes(event.resource)) return next;
+    const delta = Number(event.amount || 0);
+    player.resources[event.resource] = Math.max(0, Math.min(99, (player.resources[event.resource] || 0) + delta));
     return next;
   }
   if (event.type === "selectTile") {
@@ -1203,6 +1334,7 @@ function reducer(state, event) {
       }
     }
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "edge") {
@@ -1242,6 +1374,7 @@ function reducer(state, event) {
     }
     addLog(next, `${player.name} が領界路を建設しました。`);
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "buyDev") {
@@ -1253,14 +1386,14 @@ function reducer(state, event) {
     return next;
   }
   if (event.type === "playDev") {
-    if (player.frontierPlayedTurn === next.turnCount) return next;
-    const cardIndex = player.hiddenNewFrontiers.findIndex((card) => frontierType(card) === event.card && canPlayFrontier(card, next));
+    if (!next.testMode && player.frontierPlayedTurn === next.turnCount) return next;
+    const cardIndex = player.hiddenNewFrontiers.findIndex((card) => frontierType(card) === event.card && (next.testMode || canPlayFrontier(card, next)));
     if (actor !== next.turn || !isMainPhase(next) || cardIndex < 0) return next;
     const card = player.hiddenNewFrontiers.splice(cardIndex, 1)[0];
     const type = frontierType(card);
     player.playedNewFrontiers = player.playedNewFrontiers || [];
     player.playedNewFrontiers.push(type);
-    player.frontierPlayedTurn = next.turnCount;
+    if (!next.testMode) player.frontierPlayedTurn = next.turnCount;
     next.discard.push(type);
     if (type === "point") {
       addLog(next, `${player.name} が勝利記録を公開しました。`);
@@ -1292,6 +1425,7 @@ function reducer(state, event) {
       addLog(next, `${player.name} が補給衛星から資源を受け取りました。`);
     }
     refreshBonuses(next);
+    finishVictoryIfNeeded(next);
     return next;
   }
   if (event.type === "bankTrade") {
@@ -1449,7 +1583,7 @@ function CostTableRow({ label, cost, player }) {
   );
 }
 
-function ResourceHand({ player }) {
+function ResourceHand({ player, testMode = false, onAdjustResource }) {
   const total = totalResources(player.resources);
   return (
     <div className="resourceHand">
@@ -1458,13 +1592,28 @@ function ResourceHand({ player }) {
         <span>{total}枚</span>
       </div>
       <div className="resourceTiles">
-        {RESOURCE_KEYS.map((key) => (
-          <div key={key} className="resourceTile" style={{ "--resource": RESOURCES[key].color }}>
-            <span className="resourceName"><img className="resourceIcon" src={RESOURCES[key].icon} alt="" />{RESOURCES[key].name}</span>
-            <strong>{player.resources[key] || 0}</strong>
-            <small>{RESOURCES[key].terrain}</small>
-          </div>
-        ))}
+        {RESOURCE_KEYS.map((key) => {
+          const amount = player.resources[key] || 0;
+          return (
+            <div key={key} className="resourceTile" style={{ "--resource": RESOURCES[key].color }}>
+              <span className="resourceName"><img className="resourceIcon" src={RESOURCES[key].icon} alt="" />{RESOURCES[key].name}</span>
+              <div className={`resourceAmount ${testMode ? "testControls" : "plain"}`}>
+                {testMode && (
+                  <button type="button" className="resourceAdjust" onClick={() => onAdjustResource?.(key, -1)} disabled={amount <= 0}>
+                    -
+                  </button>
+                )}
+                <strong>{amount}</strong>
+                {testMode && (
+                  <button type="button" className="resourceAdjust" onClick={() => onAdjustResource?.(key, 1)}>
+                    +
+                  </button>
+                )}
+              </div>
+              <small>{RESOURCES[key].terrain}</small>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1494,8 +1643,8 @@ function canUseFrontierCard(card, state, player, mainActionable) {
   return (
     mainActionable &&
     !state.negotiation &&
-    player.frontierPlayedTurn !== state.turnCount &&
-    canPlayFrontier(card, state)
+    (state.testMode || player.frontierPlayedTurn !== state.turnCount) &&
+    (state.testMode || canPlayFrontier(card, state))
   );
 }
 
@@ -2069,9 +2218,11 @@ function roomIdFromInput(input) {
   }
 }
 
-function HomeScreen({ net, onCreate, onJoin, alert }) {
+function HomeScreen({ net, onCreate, onJoin, onTestMode, alert }) {
   const [joinInput, setJoinInput] = useState("");
-  const canJoin = ["POPUP1", "POPUP2", "POPUP3"].includes(joinInput.trim()) || Boolean(roomIdFromInput(joinInput));
+  const normalizedJoinInput = joinInput.trim().toUpperCase();
+  const isTestMode = normalizedJoinInput === "TESTMODE";
+  const canJoin = isTestMode || ["POPUP1", "POPUP2", "POPUP3"].includes(joinInput.trim()) || Boolean(roomIdFromInput(joinInput));
   return (
     <main className="homeMain">
       {alert && <div className="homeAlert">{alert}</div>}
@@ -2099,7 +2250,7 @@ function HomeScreen({ net, onCreate, onJoin, alert }) {
             onChange={(e) => setJoinInput(e.target.value)}
             placeholder="room IDを入力"
           />
-          <button className="homeButton" onClick={() => onJoin(joinInput)} disabled={!canJoin || !window.Peer}>
+          <button className="homeButton" onClick={() => isTestMode ? onTestMode() : onJoin(joinInput)} disabled={!canJoin || (!isTestMode && !window.Peer)}>
             <Orbit size={18} /> 部屋に参加
           </button>
         </article>
@@ -2234,7 +2385,7 @@ function LobbyScreen({
 
 function Board({ state, onEvent, myPlayerId }) {
   const active = currentPlayer(state).id;
-  const canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
+  const canClick = state.winner === null && (state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId);
   return (
     <svg viewBox="0 0 720 680" className="board" role="img" aria-label="宇宙資源盤面">
       <defs>
@@ -2425,6 +2576,18 @@ function BgmControl() {
   );
 }
 
+function WinFlash({ playerName }) {
+  if (!playerName) return null;
+  return (
+    <div className="winFlash" role="status" aria-live="assertive">
+      <div>
+        <strong>{playerName}</strong>
+        <span>WIN!</span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const initialParams = useMemo(() => new URLSearchParams(location.hash.replace("#", "")), []);
   const initialRoom = useMemo(() => initialParams.get("room") || initialParams.get("host") || initialParams.get("join") || generateRoomId(), [initialParams]);
@@ -2437,7 +2600,9 @@ function App() {
   const [pendingFrontier, setPendingFrontier] = useState(null);
   const [copyStatus, setCopyStatus] = useState("");
   const [homeAlert, setHomeAlert] = useState("");
+  const [winFlash, setWinFlash] = useState(null);
   const lastKickedAt = useRef(null);
+  const lastWinnerRef = useRef(null);
   const { net, host, join, send, closeNetwork } = usePeerRoom(state, setState, state.id, myPlayerId, setMyPlayerId, showRoomFullAlert, showHostDisconnectedAlert);
 
   function act(event) {
@@ -2459,10 +2624,23 @@ function App() {
     history.replaceState(null, "", location.pathname);
     if (reason === "hostDisconnected") {
       showHomeAlert("ホストが退出したため、ゲームが終了されました。");
-    } else if (!isParentPlayer(myPlayerId)) {
+    } else if (reason === "hostExit" && !isParentPlayer(myPlayerId)) {
       showHomeAlert("ホストがゲームを終了しました。");
     }
   }, [state.roomClosedAt]);
+
+  useEffect(() => {
+    if (state.winner === null) {
+      lastWinnerRef.current = null;
+      setWinFlash(null);
+      return;
+    }
+    if (lastWinnerRef.current === state.winner) return;
+    lastWinnerRef.current = state.winner;
+    setWinFlash(state.players[state.winner]?.name || "PLAYER");
+    const timer = window.setTimeout(() => setWinFlash(null), 1500);
+    return () => window.clearTimeout(timer);
+  }, [state.winner]);
 
   useEffect(() => {
     const kickedAt = state.players[myPlayerId]?.kickedAt;
@@ -2503,6 +2681,8 @@ function App() {
   const selectablePlayers = state.players.filter((player) => !player.isCpu || player.id === myPlayerId);
   const turnOrderText = (state.turnOrder || DEFAULT_TURN_ORDER).map((id) => state.players[id].name).join(" → ");
   const shareUrl = net.share || location.href;
+  const victoryExitCount = exitVoteCount(state);
+  const victoryExitVoted = hasExitVoted(state, myPlayerId);
 
   function copyToClipboard(text, label) {
     if (!navigator.clipboard) {
@@ -2543,6 +2723,14 @@ function App() {
     if (!roomId) return;
     join(roomId);
     setScreen("lobby");
+  }
+
+  function startTestMode() {
+    closeNetwork();
+    setState(createTestGame());
+    setMyPlayerId(0);
+    setScreen("game");
+    history.replaceState(null, "", location.pathname);
   }
 
   function showHomeAlert(text) {
@@ -2616,11 +2804,23 @@ function App() {
     act({ type: "dissolveRoom", reason: "hostExit" });
   }
 
+  function exitGame() {
+    if (state.winner !== null) {
+      act({ type: "victoryExit" });
+      return;
+    }
+    dissolveRoom();
+  }
+
+  function adjustTestResource(resource, amount) {
+    act({ type: "testAdjustResource", resource, amount });
+  }
+
   if (screen === "home") {
     return (
       <>
         <BgmControl />
-        <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} alert={homeAlert} />
+        <HomeScreen net={net} onCreate={createRoomFromHome} onJoin={joinRoomFromHome} onTestMode={startTestMode} alert={homeAlert} />
       </>
     );
   }
@@ -2648,6 +2848,7 @@ function App() {
   return (
     <>
     <BgmControl />
+    <WinFlash playerName={winFlash} />
     <main>
       <section className="topbar">
         <div>
@@ -2685,10 +2886,11 @@ function App() {
 
       <section className="players">
         {state.players.map((player) => (
-          <article key={player.id} style={{ "--player": player.color }} className={player.id === active.id ? "active" : ""}>
+          <article key={player.id} style={{ "--player": player.color }} className={`${player.id === active.id ? "active" : ""} ${state.winner === player.id ? "winnerPlayer" : ""}`}>
             <div>
               <strong>
                 {player.name}
+                {state.winner === player.id && <span className="winnerBadge">WIN!</span>}
                 {player.isCpu && <span className="badge cpuBadge">BOT</span>}
                 {player.bonus.longest && <span className="badge">最長領界路</span>}
                 {player.bonus.largestTv && <span className="badge">最大TVA力</span>}
@@ -2734,7 +2936,7 @@ function App() {
             </label>
           </div>
 
-          <ResourceHand player={me} />
+          <ResourceHand player={me} testMode={state.testMode} onAdjustResource={adjustTestResource} />
 
           <FrontierHand player={me} state={state} mainActionable={mainActionable} onCardClick={selectFrontierCard} />
 
@@ -2806,8 +3008,13 @@ function App() {
       </section>
 
       <section className="exitGame">
-        <button className="dangerButton" onClick={dissolveRoom} disabled={!isParentPlayer(myPlayerId) || net.mode === "guest"}>
-          Exit the Game
+        {state.winner !== null && <div className="exitVoteCount">{victoryExitCount} / 4</div>}
+        <button
+          className="dangerButton"
+          onClick={exitGame}
+          disabled={state.winner !== null ? victoryExitVoted : (!isParentPlayer(myPlayerId) || net.mode === "guest")}
+        >
+          {state.winner !== null && victoryExitVoted ? "EXIT RECORDED" : "EXIT THE GAME"}
         </button>
       </section>
       <FrontierUseDialog

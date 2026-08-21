@@ -254,6 +254,25 @@ h2 {
   }
 }
 
+@keyframes winBurst {
+  0% {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
 .homeHero {
   display: grid;
   gap: 14px;
@@ -663,6 +682,35 @@ h2 {
 .resourceTile strong {
   color: #ffffff;
   font-size: 28px;
+  line-height: 1;
+}
+
+.resourceAmount {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+
+.resourceAmount.testControls {
+  grid-template-columns: 30px minmax(34px, 1fr) 30px;
+}
+
+.resourceAmount.plain {
+  grid-template-columns: 1fr;
+}
+
+.resourceAmount strong {
+  text-align: center;
+}
+
+.resourceAdjust {
+  min-height: 30px;
+  width: 30px;
+  padding: 0;
+  border-color: rgba(165, 243, 252, 0.3);
+  color: #dff7ff;
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -1085,6 +1133,13 @@ h2 {
   box-shadow: 0 0 0 2px rgba(255, 243, 168, 0.55) inset;
 }
 
+.players article.winnerPlayer {
+  border-color: rgba(255, 214, 102, 0.75);
+  border-left-color: #ffd666;
+  background: linear-gradient(135deg, rgba(255, 214, 102, 0.18), rgba(255, 255, 255, 0.07));
+  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.42) inset, 0 18px 44px rgba(255, 214, 102, 0.14);
+}
+
 .lobbyPlayers article.emptySeat {
   opacity: 0.42;
   filter: saturate(0.45);
@@ -1128,6 +1183,22 @@ h2 {
   background: #bfe7ff;
 }
 
+.winnerBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 214, 102, 0.85);
+  border-radius: 999px;
+  color: #ffd666;
+  background: rgba(52, 36, 5, 0.64);
+  box-shadow: 0 0 16px rgba(255, 214, 102, 0.22);
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
 .players p {
   margin-top: 6px;
   color: #cbd6e7;
@@ -1165,14 +1236,28 @@ h2 {
 }
 
 .exitGame {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   margin-top: 16px;
   padding-bottom: 8px;
 }
 
 .exitGame button {
   min-width: 180px;
+}
+
+.exitVoteCount {
+  min-width: 86px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 214, 102, 0.4);
+  border-radius: 999px;
+  color: #ffd666;
+  background: rgba(52, 36, 5, 0.46);
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .winner {
@@ -1182,6 +1267,50 @@ h2 {
   color: #151515;
   background: #fff3a8;
   font-weight: 900;
+}
+
+.winFlash {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(255, 214, 102, 0.18), transparent 34%),
+    rgba(2, 6, 23, 0.58);
+}
+
+.winFlash > div {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 34px;
+  border: 1px solid rgba(255, 214, 102, 0.76);
+  border-radius: 8px;
+  color: #fff6c7;
+  background: linear-gradient(135deg, rgba(57, 38, 6, 0.94), rgba(11, 17, 31, 0.92));
+  box-shadow: 0 0 80px rgba(255, 214, 102, 0.36), 0 24px 80px rgba(0, 0, 0, 0.52);
+  animation: winBurst 1.5s ease both;
+}
+
+.winFlash strong,
+.winFlash span {
+  font-family: "Orbitron", Inter, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.winFlash strong {
+  font-size: clamp(32px, 8vw, 96px);
+}
+
+.winFlash span {
+  color: #ffd666;
+  font-size: clamp(52px, 12vw, 150px);
+  font-weight: 900;
+  text-shadow: 0 0 28px rgba(255, 214, 102, 0.42);
 }
 
 @media (max-width: 1050px) {
