@@ -1407,11 +1407,6 @@ function missingCost(player, cost) {
   );
 }
 
-function missingCostText(missing) {
-  const parts = Object.entries(missing).map(([key, amount]) => `${RESOURCES[key].name}${amount}`);
-  return parts.length ? parts.join(" / ") : "";
-}
-
 function Cost({ cost, player }) {
   return (
     <span className="cost">
@@ -1438,10 +1433,8 @@ function BuildOption({ label, cost, player, icon: IconComponent }) {
           <span className="buildOptionIcon" aria-hidden="true"><IconComponent /></span>
           <strong>{label}</strong>
         </div>
-        <span className="buildStatus">{affordable ? "OK" : "不足"}</span>
       </div>
       <Cost cost={cost} player={player} />
-      {!affordable && <small>不足: {missingCostText(missing)}</small>}
     </article>
   );
 }
