@@ -1398,16 +1398,48 @@ function tileName(tile) {
   return RESOURCES[tile.terrain].terrain;
 }
 
-function Cost({ cost }) {
+function missingCost(player, cost) {
+  const resources = player?.resources || {};
+  return Object.fromEntries(
+    RESOURCE_KEYS
+      .map((key) => [key, Math.max(0, (cost[key] || 0) - (resources[key] || 0))])
+      .filter(([, amount]) => amount > 0)
+  );
+}
+
+function missingCostText(missing) {
+  const parts = Object.entries(missing).map(([key, amount]) => `${RESOURCES[key].name}${amount}`);
+  return parts.length ? parts.join(" / ") : "";
+}
+
+function Cost({ cost, player }) {
   return (
     <span className="cost">
-      {Object.entries(cost).map(([key, value]) => (
-        <span key={key} style={{ "--dot": RESOURCES[key].color }}>
+      {Object.entries(cost).map(([key, value]) => {
+        const enough = player ? (player.resources?.[key] || 0) >= value : true;
+        return (
+        <span key={key} className={enough ? "enough" : "missing"} style={{ "--dot": RESOURCES[key].color }}>
           <img className="resourceIcon" src={RESOURCES[key].icon} alt="" />
           {RESOURCES[key].name} {value}
         </span>
-      ))}
+        );
+      })}
     </span>
+  );
+}
+
+function BuildOption({ label, cost, player }) {
+  const missing = missingCost(player, cost);
+  const affordable = !Object.keys(missing).length;
+  return (
+    <article className={`buildOption ${affordable ? "available" : "short"}`}>
+      <div className="buildOptionHead">
+        <strong>{label}</strong>
+        <span>{affordable ? "建設可能" : "不足"}</span>
+      </div>
+      <Cost cost={cost} player={player} />
+      {!affordable && <small>不足: {missingCostText(missing)}</small>}
+    </article>
   );
 }
 
@@ -2558,11 +2590,13 @@ function App() {
           </div>
 
           <div className="costs">
-            <h2>建設コスト</h2>
-            <p>領界路 <Cost cost={COSTS.route} /></p>
-            <p>小都市 <Cost cost={COSTS.planet} /></p>
-            <p>大都市 <Cost cost={COSTS.star} /></p>
-            <p>未知への旅 <Cost cost={COSTS.frontier} /></p>
+            <h2>建設可能</h2>
+            <div className="buildOptions">
+              <BuildOption label="領界路" cost={COSTS.route} player={me} />
+              <BuildOption label="小都市" cost={COSTS.planet} player={me} />
+              <BuildOption label="大都市" cost={COSTS.star} player={me} />
+              <BuildOption label="未知への旅" cost={COSTS.frontier} player={me} />
+            </div>
             <button onClick={() => act({ type: "buyDev" })} disabled={!mainActionable}>
               <Shuffle size={17} /> 未知への旅を獲得
             </button>

@@ -1817,16 +1817,39 @@ function tileName(tile) {
   if (tile.terrain === "desert") return "ヴォイド";
   return RESOURCES[tile.terrain].terrain;
 }
-function Cost(_ref22) {
-  var cost = _ref22.cost;
+function missingCost(player, cost) {
+  var resources = (player === null || player === void 0 ? void 0 : player.resources) || {};
+  return Object.fromEntries(RESOURCE_KEYS.map(function (key) {
+    return [key, Math.max(0, (cost[key] || 0) - (resources[key] || 0))];
+  }).filter(function (_ref22) {
+    var _ref23 = _slicedToArray(_ref22, 2),
+      amount = _ref23[1];
+    return amount > 0;
+  }));
+}
+function missingCostText(missing) {
+  var parts = Object.entries(missing).map(function (_ref24) {
+    var _ref25 = _slicedToArray(_ref24, 2),
+      key = _ref25[0],
+      amount = _ref25[1];
+    return "".concat(RESOURCES[key].name).concat(amount);
+  });
+  return parts.length ? parts.join(" / ") : "";
+}
+function Cost(_ref26) {
+  var cost = _ref26.cost,
+    player = _ref26.player;
   return /*#__PURE__*/React.createElement("span", {
     className: "cost"
-  }, Object.entries(cost).map(function (_ref23) {
-    var _ref24 = _slicedToArray(_ref23, 2),
-      key = _ref24[0],
-      value = _ref24[1];
+  }, Object.entries(cost).map(function (_ref27) {
+    var _player$resources;
+    var _ref28 = _slicedToArray(_ref27, 2),
+      key = _ref28[0],
+      value = _ref28[1];
+    var enough = player ? (((_player$resources = player.resources) === null || _player$resources === void 0 ? void 0 : _player$resources[key]) || 0) >= value : true;
     return /*#__PURE__*/React.createElement("span", {
       key: key,
+      className: enough ? "enough" : "missing",
       style: {
         "--dot": RESOURCES[key].color
       }
@@ -1837,8 +1860,23 @@ function Cost(_ref22) {
     }), RESOURCES[key].name, " ", value);
   }));
 }
-function ResourceHand(_ref25) {
-  var player = _ref25.player;
+function BuildOption(_ref29) {
+  var label = _ref29.label,
+    cost = _ref29.cost,
+    player = _ref29.player;
+  var missing = missingCost(player, cost);
+  var affordable = !Object.keys(missing).length;
+  return /*#__PURE__*/React.createElement("article", {
+    className: "buildOption ".concat(affordable ? "available" : "short")
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "buildOptionHead"
+  }, /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("span", null, affordable ? "建設可能" : "不足")), /*#__PURE__*/React.createElement(Cost, {
+    cost: cost,
+    player: player
+  }), !affordable && /*#__PURE__*/React.createElement("small", null, "\u4E0D\u8DB3: ", missingCostText(missing)));
+}
+function ResourceHand(_ref30) {
+  var player = _ref30.player;
   var total = totalResources(player.resources);
   return /*#__PURE__*/React.createElement("div", {
     className: "resourceHand"
@@ -1862,10 +1900,10 @@ function ResourceHand(_ref25) {
     }), RESOURCES[key].name), /*#__PURE__*/React.createElement("strong", null, player.resources[key] || 0), /*#__PURE__*/React.createElement("small", null, RESOURCES[key].terrain));
   })));
 }
-function ResourceBundleInput(_ref26) {
-  var title = _ref26.title,
-    value = _ref26.value,
-    _onChange = _ref26.onChange;
+function ResourceBundleInput(_ref31) {
+  var title = _ref31.title,
+    value = _ref31.value,
+    _onChange = _ref31.onChange;
   return /*#__PURE__*/React.createElement("div", {
     className: "bundleInput"
   }, /*#__PURE__*/React.createElement("h3", null, title), RESOURCE_KEYS.map(function (key) {
@@ -1889,11 +1927,11 @@ function ResourceBundleInput(_ref26) {
 function emptyBundle() {
   return emptyResources(0);
 }
-function NegotiationPanel(_ref27) {
+function NegotiationPanel(_ref32) {
   var _humanPartners$0$id, _humanPartners$, _state$players$select;
-  var state = _ref27.state,
-    myPlayerId = _ref27.myPlayerId,
-    onEvent = _ref27.onEvent;
+  var state = _ref32.state,
+    myPlayerId = _ref32.myPlayerId,
+    onEvent = _ref32.onEvent;
   var _useState = useState((myPlayerId + 1) % 4),
     _useState2 = _slicedToArray(_useState, 2),
     partnerId = _useState2[0],
@@ -2019,11 +2057,11 @@ function NegotiationPanel(_ref27) {
     }, line);
   }))));
 }
-function CriminalPanel(_ref28) {
+function CriminalPanel(_ref33) {
   var _state$pendingDiscard2;
-  var state = _ref28.state,
-    myPlayerId = _ref28.myPlayerId,
-    onEvent = _ref28.onEvent;
+  var state = _ref33.state,
+    myPlayerId = _ref33.myPlayerId,
+    onEvent = _ref33.onEvent;
   var _useState7 = useState(emptyBundle),
     _useState8 = _slicedToArray(_useState7, 2),
     discardBundle = _useState8[0],
@@ -2033,10 +2071,10 @@ function CriminalPanel(_ref28) {
     victimId = _useState0[0],
     setVictimId = _useState0[1];
   var need = Number(((_state$pendingDiscard2 = state.pendingDiscards) === null || _state$pendingDiscard2 === void 0 ? void 0 : _state$pendingDiscard2[myPlayerId]) || 0);
-  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref29) {
-    var _ref30 = _slicedToArray(_ref29, 2),
-      playerId = _ref30[0],
-      needCount = _ref30[1];
+  var pendingDiscardNames = pendingDiscardEntries(state).map(function (_ref34) {
+    var _ref35 = _slicedToArray(_ref34, 2),
+      playerId = _ref35[0],
+      needCount = _ref35[1];
     return "".concat(state.players[playerId].name, ":").concat(needCount, "\u679A");
   });
   var pendingSteal = state.pendingSteal;
@@ -2170,8 +2208,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
   }
   function broadcastState(next) {
     var exceptConn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-    connections.current.forEach(function (_ref31) {
-      var c = _ref31.conn;
+    connections.current.forEach(function (_ref36) {
+      var c = _ref36.conn;
       return c !== exceptConn && c.open && c.send({
         type: "state",
         state: next
@@ -2366,8 +2404,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     var _peerRef$current, _peerRef$current$dest;
     suppressGuestCloseNotice.current = true;
     connections.current.forEach(function (item) {
-      var _close, _ref32;
-      return (_close = (_ref32 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref32);
+      var _close, _ref37;
+      return (_close = (_ref37 = item.conn || item).close) === null || _close === void 0 ? void 0 : _close.call(_ref37);
     });
     connections.current = [];
     (_peerRef$current = peerRef.current) === null || _peerRef$current === void 0 || (_peerRef$current$dest = _peerRef$current.destroy) === null || _peerRef$current$dest === void 0 || _peerRef$current$dest.call(_peerRef$current);
@@ -2380,8 +2418,8 @@ function usePeerRoom(state, setState, roomId, myPlayerId, setMyPlayerId, onRoomF
     });
   }
   useEffect(function () {
-    if (net.mode === "host") connections.current.forEach(function (_ref33) {
-      var c = _ref33.conn;
+    if (net.mode === "host") connections.current.forEach(function (_ref38) {
+      var c = _ref38.conn;
       return c.open && c.send({
         type: "state",
         state: state
@@ -2427,11 +2465,11 @@ function roomIdFromInput(input) {
     return normalize(_params.get("join") || _params.get("host") || value);
   }
 }
-function HomeScreen(_ref34) {
-  var net = _ref34.net,
-    onCreate = _ref34.onCreate,
-    onJoin = _ref34.onJoin,
-    alert = _ref34.alert;
+function HomeScreen(_ref39) {
+  var net = _ref39.net,
+    onCreate = _ref39.onCreate,
+    onJoin = _ref39.onJoin,
+    alert = _ref39.alert;
   var _useState13 = useState(""),
     _useState14 = _slicedToArray(_useState13, 2),
     joinInput = _useState14[0],
@@ -2469,17 +2507,17 @@ function HomeScreen(_ref34) {
     className: "homeNote"
   }, /*#__PURE__*/React.createElement("span", null, net.status), /*#__PURE__*/React.createElement("p", null, "\u65E2\u5B58\u306E\u5171\u6709\u30EA\u30F3\u30AF\u3092\u958B\u3044\u305F\u5834\u5408\u306F\u3001\u81EA\u52D5\u3067\u53C2\u52A0\u753B\u9762\u3078\u9032\u307F\u307E\u3059\u3002")));
 }
-function LobbyScreen(_ref35) {
-  var state = _ref35.state,
-    myPlayerId = _ref35.myPlayerId,
-    net = _ref35.net,
-    onEvent = _ref35.onEvent,
-    onCopyInvite = _ref35.onCopyInvite,
-    onCopyRules = _ref35.onCopyRules,
-    copyStatus = _ref35.copyStatus,
-    onStartHuman = _ref35.onStartHuman,
-    onStartCpu = _ref35.onStartCpu,
-    onDissolveRoom = _ref35.onDissolveRoom;
+function LobbyScreen(_ref40) {
+  var state = _ref40.state,
+    myPlayerId = _ref40.myPlayerId,
+    net = _ref40.net,
+    onEvent = _ref40.onEvent,
+    onCopyInvite = _ref40.onCopyInvite,
+    onCopyRules = _ref40.onCopyRules,
+    copyStatus = _ref40.copyStatus,
+    onStartHuman = _ref40.onStartHuman,
+    onStartCpu = _ref40.onStartCpu,
+    onDissolveRoom = _ref40.onDissolveRoom;
   var readyCount = readyHumanCount(state);
   var ownReady = isReadyHuman(state.players[myPlayerId]);
   var isParent = isParentPlayer(myPlayerId);
@@ -2597,10 +2635,10 @@ function LobbyScreen(_ref35) {
     }, "kick"));
   })));
 }
-function Board(_ref36) {
-  var state = _ref36.state,
-    onEvent = _ref36.onEvent,
-    myPlayerId = _ref36.myPlayerId;
+function Board(_ref41) {
+  var state = _ref41.state,
+    onEvent = _ref41.onEvent,
+    myPlayerId = _ref41.myPlayerId;
   var active = currentPlayer(state).id;
   var canClick = state.phase === "setup" ? state.orderLocked && active === myPlayerId : state.turn === myPlayerId;
   return /*#__PURE__*/React.createElement("svg", {
@@ -3259,14 +3297,24 @@ function App() {
     size: 17
   }), " \u30E9\u30F4\u30A7\u30B8\u30E3\u30FC\u30BA")), /*#__PURE__*/React.createElement("div", {
     className: "costs"
-  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u30B3\u30B9\u30C8"), /*#__PURE__*/React.createElement("p", null, "\u9818\u754C\u8DEF ", /*#__PURE__*/React.createElement(Cost, {
-    cost: COSTS.route
-  })), /*#__PURE__*/React.createElement("p", null, "\u5C0F\u90FD\u5E02 ", /*#__PURE__*/React.createElement(Cost, {
-    cost: COSTS.planet
-  })), /*#__PURE__*/React.createElement("p", null, "\u5927\u90FD\u5E02 ", /*#__PURE__*/React.createElement(Cost, {
-    cost: COSTS.star
-  })), /*#__PURE__*/React.createElement("p", null, "\u672A\u77E5\u3078\u306E\u65C5 ", /*#__PURE__*/React.createElement(Cost, {
-    cost: COSTS.frontier
+  }, /*#__PURE__*/React.createElement("h2", null, "\u5EFA\u8A2D\u53EF\u80FD"), /*#__PURE__*/React.createElement("div", {
+    className: "buildOptions"
+  }, /*#__PURE__*/React.createElement(BuildOption, {
+    label: "\u9818\u754C\u8DEF",
+    cost: COSTS.route,
+    player: me
+  }), /*#__PURE__*/React.createElement(BuildOption, {
+    label: "\u5C0F\u90FD\u5E02",
+    cost: COSTS.planet,
+    player: me
+  }), /*#__PURE__*/React.createElement(BuildOption, {
+    label: "\u5927\u90FD\u5E02",
+    cost: COSTS.star,
+    player: me
+  }), /*#__PURE__*/React.createElement(BuildOption, {
+    label: "\u672A\u77E5\u3078\u306E\u65C5",
+    cost: COSTS.frontier,
+    player: me
   })), /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
       return act({
